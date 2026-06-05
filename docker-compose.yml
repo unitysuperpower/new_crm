@@ -1,0 +1,68 @@
+version: '3.8'
+
+services:
+  web:
+    image: nginx:stable-alpine
+    container_name: new_web
+    ports:
+      - "80:80"
+    volumes:
+      - .:/var/www/html
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - php
+    networks:
+      - new_network
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile.php
+    container_name: new_php
+    volumes:
+      - .:/var/www/html
+      - ./php/php.ini:/usr/local/etc/php/php.ini:ro
+    depends_on:
+      - db
+    networks:
+      - new_network
+    environment:
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_DATABASE: new_crm
+      DB_USERNAME: root
+      DB_PASSWORD: ""
+
+  db:
+    image: mysql:8.0
+    container_name: new_db
+    restart: always
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+      MYSQL_DATABASE: new_crm
+    volumes:
+      - db_data:/var/lib/mysql
+    networks:
+      - new_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: new_phpmyadmin
+    depends_on:
+      - db
+    environment:
+      PMA_HOST: db
+      PMA_USER: root
+      PMA_PASSWORD: ""
+      PMA_ALLOW_NO_PASSWORD: "yes"
+    ports:
+      - "8080:80"
+    networks:
+      - new_network
+
+volumes:
+  db_data:
+
+networks:
+  new_network:
+    driver: bridge
