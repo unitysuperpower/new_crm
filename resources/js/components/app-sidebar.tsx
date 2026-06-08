@@ -1,4 +1,4 @@
-import { Link } from '@inertiajs/react';
+import { Link, usePage } from '@inertiajs/react';
 import { BookOpen, ClipboardList, FolderGit2, GraduationCap, LayoutGrid } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
@@ -17,24 +17,34 @@ import type { NavItem } from '@/types';
 
 export function AppSidebar() {
     const dashboardUrl = '/dashboard';
+    const { auth } = usePage().props;
+    const permissions = auth.user?.permissions ?? [];
+    const canViewInquiries = permissions.includes('inquiry:view');
+    const canManagePrograms = permissions.includes('program:manage');
+    const canManageCampuses = permissions.includes('campus:manage');
 
     const mainNavItems: NavItem[] = [
-        {
+        canViewInquiries && {
             title: 'Dashboard',
             href: dashboardUrl,
             icon: LayoutGrid,
         },
-        {
+        canViewInquiries && {
             title: 'Inquiries',
             href: '/inquiries',
             icon: ClipboardList,
         },
-        {
+        canManagePrograms && {
             title: 'Programs',
             href: '/programs',
             icon: GraduationCap,
         },
-    ];
+        canManageCampuses && {
+            title: 'Campuses',
+            href: '/campuses',
+            icon: FolderGit2,
+        },
+    ].filter(Boolean) as NavItem[];
 
     const footerNavItems: NavItem[] = [
         {

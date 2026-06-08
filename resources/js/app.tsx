@@ -5,10 +5,21 @@ import { initializeTheme } from '@/hooks/use-appearance';
 import AppLayout from '@/layouts/app-layout';
 import AuthLayout from '@/layouts/auth-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import type { ComponentType } from 'react';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
+const pages = import.meta.glob('./pages/**/*.tsx');
 
 createInertiaApp({
+    resolve: async (name) => {
+        const page = pages[`./pages/${name}.tsx`];
+
+        if (!page) {
+            throw new Error(`Page not found: ${name}`);
+        }
+
+        return ((await page()) as { default: ComponentType }).default;
+    },
     title: (title) => (title ? `${title} - ${appName}` : appName),
     layout: (name) => {
         switch (true) {

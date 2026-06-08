@@ -2,14 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { Head, router } from '@inertiajs/react';
 import {
+    Building2,
     CalendarClock,
     Eye,
     FileSpreadsheet,
     Filter,
     MessageSquarePlus,
+    Moon,
+    Power,
+    PowerOff,
     Plus,
     Search,
     Send,
+    Sun,
     Upload,
     UserCheck,
 } from 'lucide-react';
@@ -27,6 +32,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAppearance } from '@/hooks/use-appearance';
 import {
     Select,
     SelectContent,
@@ -36,6 +42,7 @@ import {
 } from '@/components/ui/select';
 
 type Option = { id: number; name: string };
+type CampusOption = Option & { is_active: boolean };
 type Stream = {
     id: number;
     response: string;
@@ -53,6 +60,9 @@ type Inquiry = {
     program_id: number | null;
     program: Option | null;
     previous_program: string | null;
+    campus_id: number | null;
+    campus_model: Option | null;
+    campus: string | null;
     status: string;
     assigned_user_id: number | null;
     assigned_user: Option | null;
@@ -72,6 +82,8 @@ type InquiryForm = {
     source: string;
     program_id: string;
     previous_program: string;
+    campus_id: string;
+    campus: string;
     status: string;
     assigned_user_id: string;
     department: string;
@@ -88,6 +100,8 @@ const emptyInquiry: InquiryForm = {
     source: '',
     program_id: '',
     previous_program: '',
+    campus_id: '',
+    campus: '',
     status: 'pending',
     assigned_user_id: '',
     department: 'admission',
@@ -101,6 +115,7 @@ export default function Dashboard({
     filters,
     inquiries,
     programs,
+    campuses,
     teamMembers,
     sourceOptions,
     statusOptions,
@@ -112,6 +127,7 @@ export default function Dashboard({
     filters: Record<string, string>;
     inquiries: Inquiry[];
     programs: Option[];
+    campuses: CampusOption[];
     teamMembers: Option[];
     sourceOptions: string[];
     statusOptions: string[];
@@ -120,8 +136,10 @@ export default function Dashboard({
         canCreateInquiry: boolean;
         canImportInquiry: boolean;
         canAssignInquiry: boolean;
+        canManageCampus: boolean;
     };
 }) {
+    const { resolvedAppearance, updateAppearance } = useAppearance();
     const csvInputRef = useRef<HTMLInputElement>(null);
     const [filterForm, setFilterForm] = useState(filters);
     const [createOpen, setCreateOpen] = useState(false);
@@ -134,6 +152,10 @@ export default function Dashboard({
     const [activeHistory, setActiveHistory] = useState('all');
     const [selectedInquiryIds, setSelectedInquiryIds] = useState<number[]>([]);
     const [bulkAssignedUserId, setBulkAssignedUserId] = useState('');
+    const [expandedDiscussionIds, setExpandedDiscussionIds] = useState<number[]>([]);
+    const [togglingCampusIds, setTogglingCampusIds] = useState<number[]>([]);
+
+    const activeCampuses = useMemo(() => campuses.filter((campus) => campus.is_active), [campuses]);
 
     const selectedUserTabs = useMemo(() => {
         const users = new Map<string, string>();
@@ -166,6 +188,17 @@ export default function Dashboard({
     const submitFilters = (event: FormEvent) => {
         event.preventDefault();
         router.get(pageUrl, cleanPayload(filterForm), {
+            preserveState: true,
+            replace: true,
+        });
+    };
+
+    const setInquiryScope = (scope: 'all' | 'assigned_to_me') => {
+        const nextFilters = { ...filterForm, scope };
+
+        setFilterForm(nextFilters);
+        setSelectedInquiryIds([]);
+        router.get(pageUrl, cleanPayload(nextFilters), {
             preserveState: true,
             replace: true,
         });
@@ -224,6 +257,12 @@ export default function Dashboard({
         setSelectedInquiryIds(checked ? inquiries.map((inquiry) => inquiry.id) : []);
     };
 
+    const toggleDiscussion = (inquiryId: number) => {
+        setExpandedDiscussionIds((current) =>
+            current.includes(inquiryId) ? current.filter((id) => id !== inquiryId) : [...current, inquiryId],
+        );
+    };
+
     const updateInquiry = (event: FormEvent) => {
         event.preventDefault();
         if (!selected) return;
@@ -263,22 +302,51 @@ export default function Dashboard({
         if (!file) return;
 
         const rows = parseCsv(await file.text())
-            .map((row) => csvRowToInquiry(row, programs, teamMembers))
+            .map((row) => csvRowToInquiry(row, programs, activeCampuses, teamMembers))
             .filter((row) => row.name || row.phone || row.email);
 
         setImportRows(rows);
         setImportOpen(true);
     };
 
+    const toggleCampus = (campus: CampusOption) => {
+        if (!crmPermissions.canManageCampus) return;
+
+        setTogglingCampusIds((current) => [...new Set([...current, campus.id])]);
+        router.patch(
+            `/campuses/${campus.id}/toggle`,
+            { is_active: !campus.is_active },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => {
+                    setTogglingCampusIds((current) => current.filter((id) => id !== campus.id));
+                },
+            },
+        );
+    };
+
     return (
         <>
             <Head title={pageTitle} />
             <div className="flex h-full flex-1 flex-col gap-4 overflow-x-auto p-4">
-                <div className="flex flex-col gap-1">
-                    <h1 className="text-xl font-semibold">{pageTitle}</h1>
-                    <p className="text-muted-foreground text-sm">
-                        Review, filter, assign, and follow up on inquiries.
-                    </p>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-xl font-semibold">{pageTitle}</h1>
+                        <p className="text-muted-foreground text-sm">
+                            Review, filter, assign, and follow up on inquiries.
+                        </p>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full justify-center md:w-auto"
+                        aria-label={`Switch to ${resolvedAppearance === 'dark' ? 'light' : 'dark'} theme`}
+                        onClick={() => updateAppearance(resolvedAppearance === 'dark' ? 'light' : 'dark')}
+                    >
+                        {resolvedAppearance === 'dark' ? <Sun /> : <Moon />}
+                        {resolvedAppearance === 'dark' ? 'Light' : 'Dark'}
+                    </Button>
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-4">
@@ -288,95 +356,198 @@ export default function Dashboard({
                     <Metric label="My assigned" value={inquiries.filter((item) => item.can_update).length} />
                 </div>
 
-                <div className="rounded-lg border bg-background">
-                    <div className="flex flex-col gap-3 border-b p-4 lg:flex-row lg:items-center lg:justify-between">
-                        <form className="grid flex-1 gap-2 md:grid-cols-[1.4fr_1fr_1fr_1fr_1fr_0.8fr_0.8fr_auto]" onSubmit={submitFilters}>
-                            <div className="relative">
-                                <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
-                                <Input
-                                    className="pl-9"
-                                    placeholder="Search name, phone, email, city"
-                                    value={filterForm.search ?? ''}
-                                    onChange={(event) => setFilterForm({ ...filterForm, search: event.target.value })}
-                                />
-                            </div>
-                            <FilterSelect
-                                placeholder="Status"
-                                value={filterForm.status ?? ''}
-                                options={statusOptions}
-                                onChange={(status) => setFilterForm({ ...filterForm, status })}
-                            />
-                            <FilterSelect
-                                placeholder="Department"
-                                value={filterForm.department ?? ''}
-                                options={departmentOptions}
-                                onChange={(department) => setFilterForm({ ...filterForm, department })}
-                            />
-                            <Select
-                                value={filterForm.assigned_user_id || 'all'}
-                                onValueChange={(value) =>
-                                    setFilterForm({ ...filterForm, assigned_user_id: value === 'all' ? '' : value })
-                                }
-                            >
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Assigned user" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All users</SelectItem>
-                                    {teamMembers.map((member) => (
-                                        <SelectItem key={member.id} value={String(member.id)}>
-                                            {member.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            <FilterSelect
-                                placeholder="Source"
-                                value={filterForm.source ?? ''}
-                                options={sourceOptions}
-                                onChange={(source) => setFilterForm({ ...filterForm, source })}
-                            />
-                            <Input
-                                type="date"
-                                aria-label="From date"
-                                value={filterForm.date_from ?? ''}
-                                onChange={(event) => setFilterForm({ ...filterForm, date_from: event.target.value })}
-                            />
-                            <Input
-                                type="date"
-                                aria-label="To date"
-                                value={filterForm.date_to ?? ''}
-                                onChange={(event) => setFilterForm({ ...filterForm, date_to: event.target.value })}
-                            />
-                            <Button type="submit" variant="outline">
-                                <Filter />
-                                Apply
-                            </Button>
-                        </form>
+                <div className="flex flex-col gap-3 rounded-lg border bg-background p-4 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h2 className="text-sm font-semibold">Inquiry workspace</h2>
+                        <p className="text-muted-foreground text-sm">
+                            Switch between the full inquiry list and inquiries assigned to your user.
+                        </p>
+                    </div>
+                    <div className="grid grid-cols-2 rounded-md border bg-muted/40 p-1 md:w-auto">
+                        <button
+                            type="button"
+                            className={[
+                                'h-9 rounded-md px-4 text-sm font-medium transition',
+                                (filterForm.scope ?? 'all') === 'all'
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground',
+                            ].join(' ')}
+                            onClick={() => setInquiryScope('all')}
+                        >
+                            All inquiries
+                        </button>
+                        <button
+                            type="button"
+                            className={[
+                                'h-9 rounded-md px-4 text-sm font-medium transition',
+                                filterForm.scope === 'assigned_to_me'
+                                    ? 'bg-background text-foreground shadow-sm'
+                                    : 'text-muted-foreground hover:text-foreground',
+                            ].join(' ')}
+                            onClick={() => setInquiryScope('assigned_to_me')}
+                        >
+                            Assigned to me
+                        </button>
+                    </div>
+                </div>
 
-                        <div className="flex gap-2">
-                            {crmPermissions.canImportInquiry && (
-                                <>
-                                    <input
-                                        ref={csvInputRef}
-                                        className="hidden"
-                                        type="file"
-                                        accept=".csv,text/csv"
-                                        onChange={(event) => void handleCsv(event.target.files?.[0])}
-                                    />
-                                    <Button type="button" variant="outline" onClick={() => csvInputRef.current?.click()}>
-                                        <Upload />
-                                        CSV
-                                    </Button>
-                                </>
-                            )}
-                            {crmPermissions.canCreateInquiry && (
-                                <Button type="button" onClick={() => setCreateOpen(true)}>
-                                    <Plus />
-                                    Add
-                                </Button>
-                            )}
+                {crmPermissions.canManageCampus && (
+                    <div className="rounded-lg border bg-background p-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex items-start gap-3">
+                                <div className="bg-muted flex size-10 shrink-0 items-center justify-center rounded-md">
+                                    <Building2 className="text-muted-foreground size-5" />
+                                </div>
+                                <div>
+                                    <h2 className="text-sm font-semibold">Campus visibility</h2>
+                                    <p className="text-muted-foreground text-sm">
+                                        Hidden campuses stay saved, but their inquiries are removed from this list.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                {campuses.map((campus) => (
+                                    <button
+                                        key={campus.id}
+                                        type="button"
+                                        aria-pressed={campus.is_active}
+                                        disabled={togglingCampusIds.includes(campus.id)}
+                                        className={[
+                                            'inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm font-medium transition',
+                                            campus.is_active
+                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                                : 'border-muted bg-muted/40 text-muted-foreground hover:bg-muted',
+                                            togglingCampusIds.includes(campus.id) ? 'cursor-wait opacity-60' : '',
+                                        ].join(' ')}
+                                        onClick={() => toggleCampus(campus)}
+                                    >
+                                        {campus.is_active ? <Power className="size-4" /> : <PowerOff className="size-4" />}
+                                        <span>{campus.name}</span>
+                                    </button>
+                                ))}
+                                {campuses.length === 0 && (
+                                    <span className="text-muted-foreground text-sm">No campuses created yet.</span>
+                                )}
+                            </div>
                         </div>
+                    </div>
+                )}
+
+                <div className="rounded-lg border bg-background">
+                    <div className="space-y-3 border-b p-4">
+                        <form className="space-y-3" onSubmit={submitFilters}>
+                            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+                                <div className="relative w-full lg:max-w-2xl">
+                                    <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+                                    <Input
+                                        className="h-11 pl-9 text-base md:text-sm"
+                                        placeholder="Search name, phone, email, city, campus, source"
+                                        value={filterForm.search ?? ''}
+                                        onChange={(event) => setFilterForm({ ...filterForm, search: event.target.value })}
+                                    />
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                    <Button type="submit" variant="outline">
+                                        <Search />
+                                        Search
+                                    </Button>
+                                    {crmPermissions.canImportInquiry && (
+                                        <>
+                                            <input
+                                                ref={csvInputRef}
+                                                className="hidden"
+                                                type="file"
+                                                accept=".csv,text/csv"
+                                                onChange={(event) => void handleCsv(event.target.files?.[0])}
+                                            />
+                                            <Button type="button" variant="outline" onClick={() => csvInputRef.current?.click()}>
+                                                <Upload />
+                                                CSV
+                                            </Button>
+                                        </>
+                                    )}
+                                    
+                                    <Button type="button" onClick={() => setCreateOpen(true)}>
+                                        <Plus />
+                                        Add
+                                    </Button>
+                                </div>
+                            </div>
+
+                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.1fr_1fr_1fr_0.9fr_0.9fr_auto]">
+                                <FilterSelect
+                                    placeholder="Status"
+                                    value={filterForm.status ?? ''}
+                                    options={statusOptions}
+                                    onChange={(status) => setFilterForm({ ...filterForm, status })}
+                                />
+                                <FilterSelect
+                                    placeholder="Department"
+                                    value={filterForm.department ?? ''}
+                                    options={departmentOptions}
+                                    onChange={(department) => setFilterForm({ ...filterForm, department })}
+                                />
+                                <Select
+                                    value={filterForm.assigned_user_id || 'all'}
+                                    onValueChange={(value) =>
+                                        setFilterForm({ ...filterForm, assigned_user_id: value === 'all' ? '' : value })
+                                    }
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Assigned user" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All users</SelectItem>
+                                        {teamMembers.map((member) => (
+                                            <SelectItem key={member.id} value={String(member.id)}>
+                                                {member.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <FilterSelect
+                                    placeholder="Source"
+                                    value={filterForm.source ?? ''}
+                                    options={sourceOptions}
+                                    onChange={(source) => setFilterForm({ ...filterForm, source })}
+                                />
+                                <Select
+                                    value={filterForm.campus_id || 'all'}
+                                    onValueChange={(value) =>
+                                        setFilterForm({ ...filterForm, campus_id: value === 'all' ? '' : value })
+                                    }
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Campus" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All campus</SelectItem>
+                                        {activeCampuses.map((campus) => (
+                                            <SelectItem key={campus.id} value={String(campus.id)}>
+                                                {campus.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Input
+                                    type="date"
+                                    aria-label="From date"
+                                    value={filterForm.date_from ?? ''}
+                                    onChange={(event) => setFilterForm({ ...filterForm, date_from: event.target.value })}
+                                />
+                                <Input
+                                    type="date"
+                                    aria-label="To date"
+                                    value={filterForm.date_to ?? ''}
+                                    onChange={(event) => setFilterForm({ ...filterForm, date_to: event.target.value })}
+                                />
+                                <Button type="submit" variant="secondary">
+                                    <Filter />
+                                    Apply
+                                </Button>
+                            </div>
+                        </form>
                     </div>
 
                     {crmPermissions.canAssignInquiry && (
@@ -412,7 +583,7 @@ export default function Dashboard({
                     )}
 
                     <div className="overflow-x-auto">
-                        <table className="w-full min-w-[1040px] text-sm">
+                        <table className="w-full min-w-[1180px] text-sm">
                             <thead className="bg-muted/60 text-muted-foreground">
                                 <tr>
                                     {crmPermissions.canAssignInquiry && (
@@ -424,15 +595,17 @@ export default function Dashboard({
                                             />
                                         </Th>
                                     )}
+                                    <Th>Action</Th>
                                     <Th>Name</Th>
                                     <Th>Source</Th>
                                     <Th>Program</Th>
+                                    <Th>Previous program</Th>
+                                    <Th>Campus</Th>
                                     <Th>Assigned</Th>
                                     <Th>Status</Th>
                                     <Th>Department</Th>
                                     <Th>Follow up</Th>
                                     <Th>Last discussion</Th>
-                                    <Th></Th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -450,12 +623,20 @@ export default function Dashboard({
                                             </Td>
                                         )}
                                         <Td>
+                                            <Button type="button" variant="ghost" size="sm" onClick={() => openDetail(inquiry)}>
+                                                <Eye />
+                                                View
+                                            </Button>
+                                        </Td>
+                                        <Td>
                                             <div className="font-medium">{inquiry.name}</div>
                                             <div className="text-muted-foreground">{inquiry.phone}</div>
                                             {inquiry.email && <div className="text-muted-foreground">{inquiry.email}</div>}
                                         </Td>
                                         <Td>{inquiry.source || 'Not set'}</Td>
-                                        <Td>{inquiry.program?.name ?? inquiry.previous_program ?? 'No program'}</Td>
+                                        <Td>{inquiry.program?.name ?? 'No program'}</Td>
+                                        <Td>{inquiry.previous_program || 'Not set'}</Td>
+                                        <Td>{inquiry.campus_model?.name ?? inquiry.campus ?? 'Not set'}</Td>
                                         <Td>{inquiry.assigned_user?.name ?? 'Unassigned'}</Td>
                                         <Td>
                                             <Badge variant={inquiry.status === 'pending' ? 'secondary' : 'outline'}>
@@ -469,14 +650,12 @@ export default function Dashboard({
                                                 {inquiry.next_follow_up_at ?? 'Not set'}
                                             </span>
                                         </Td>
-                                        <Td className="max-w-[260px] truncate">
-                                            {inquiry.streams[0]?.response ?? inquiry.message ?? 'No discussion yet'}
-                                        </Td>
-                                        <Td className="text-right">
-                                            <Button type="button" variant="ghost" size="sm" onClick={() => openDetail(inquiry)}>
-                                                <Eye />
-                                                View
-                                            </Button>
+                                        <Td className="max-w-[300px]">
+                                            <LastDiscussion
+                                                text={inquiry.streams[0]?.response ?? inquiry.message ?? 'No discussion yet'}
+                                                expanded={expandedDiscussionIds.includes(inquiry.id)}
+                                                onToggle={() => toggleDiscussion(inquiry.id)}
+                                            />
                                         </Td>
                                     </tr>
                                 ))}
@@ -484,7 +663,7 @@ export default function Dashboard({
                                     <tr>
                                         <td
                                             className="text-muted-foreground p-8 text-center"
-                                            colSpan={crmPermissions.canAssignInquiry ? 10 : 9}
+                                            colSpan={crmPermissions.canAssignInquiry ? 12 : 11}
                                         >
                                             No inquiries found.
                                         </td>
@@ -505,6 +684,7 @@ export default function Dashboard({
                     <InquiryFormFields
                         form={newInquiry}
                         programs={programs}
+                        campuses={activeCampuses}
                         teamMembers={teamMembers}
                         statusOptions={statusOptions}
                         departmentOptions={departmentOptions}
@@ -530,6 +710,8 @@ export default function Dashboard({
                                         'Email',
                                         'Source',
                                         'Program',
+                                        'Previous program',
+                                        'Campus',
                                         'Assigned',
                                         'Status',
                                         'Department',
@@ -549,6 +731,8 @@ export default function Dashboard({
                                         <Td>{row.email}</Td>
                                         <Td>{row.source}</Td>
                                         <Td>{programs.find((program) => String(program.id) === row.program_id)?.name}</Td>
+                                        <Td>{row.previous_program}</Td>
+                                        <Td>{activeCampuses.find((campus) => String(campus.id) === row.campus_id)?.name ?? row.campus}</Td>
                                         <Td>{teamMembers.find((member) => String(member.id) === row.assigned_user_id)?.name}</Td>
                                         <Td>{row.status}</Td>
                                         <Td>{row.department}</Td>
@@ -617,7 +801,9 @@ export default function Dashboard({
                             </form>
 
                             <div className="grid gap-3 rounded-md border p-3 text-sm md:grid-cols-2">
-                                <Info label="Program" value={selected.program?.name ?? selected.previous_program ?? 'No program'} />
+                                <Info label="Program" value={selected.program?.name ?? 'No program'} />
+                                <Info label="Previous program" value={selected.previous_program ?? 'Not set'} />
+                                <Info label="Campus" value={selected.campus_model?.name ?? selected.campus ?? 'Not set'} />
                                 <Info label="Source" value={selected.source ?? 'Not set'} />
                                 <Info label="Assigned user" value={selected.assigned_user?.name ?? 'Unassigned'} />
                                 <Info label="Address" value={selected.address ?? 'No address'} />
@@ -689,6 +875,7 @@ export default function Dashboard({
 function InquiryFormFields({
     form,
     programs,
+    campuses,
     teamMembers,
     statusOptions,
     departmentOptions,
@@ -697,6 +884,7 @@ function InquiryFormFields({
 }: {
     form: InquiryForm;
     programs: Option[];
+    campuses: Option[];
     teamMembers: Option[];
     statusOptions: string[];
     departmentOptions: string[];
@@ -722,6 +910,13 @@ function InquiryFormFields({
                     label="Previous program"
                     value={form.previous_program}
                     onChange={(previous_program) => onChange({ ...form, previous_program })}
+                />
+                <SelectField
+                    label="Campus"
+                    value={form.campus_id}
+                    placeholder="No campus"
+                    options={campuses.map((campus) => ({ value: String(campus.id), label: campus.name }))}
+                    onChange={(campus_id) => onChange({ ...form, campus_id })}
                 />
                 <SelectField
                     label="Assigned user"
@@ -881,6 +1076,31 @@ function Info({ label, value }: { label: string; value: string }) {
     );
 }
 
+function LastDiscussion({
+    text,
+    expanded,
+    onToggle,
+}: {
+    text: string;
+    expanded: boolean;
+    onToggle: () => void;
+}) {
+    const limit = 40;
+    const canExpand = text.length > limit;
+    const preview = canExpand && !expanded ? `${text.slice(0, limit).trim()}...` : text;
+
+    return (
+        <div className="space-y-1">
+            <p className={expanded ? 'whitespace-pre-wrap' : 'line-clamp-2'}>{preview}</p>
+            {canExpand && (
+                <Button type="button" variant="link" className="h-auto p-0 text-xs" onClick={onToggle}>
+                    {expanded ? 'Show less' : 'Read more'}
+                </Button>
+            )}
+        </div>
+    );
+}
+
 function Th({ children }: { children?: ReactNode }) {
     return <th className="px-4 py-3 text-left font-medium">{children}</th>;
 }
@@ -902,6 +1122,8 @@ function normalizeInquiry(row: InquiryForm) {
         source: row.source || null,
         program_id: row.program_id || null,
         previous_program: row.previous_program || null,
+        campus_id: row.campus_id || null,
+        campus: row.campus || null,
         assigned_user_id: row.assigned_user_id || null,
         next_follow_up_at: row.next_follow_up_at || null,
         message: row.message || null,
@@ -947,8 +1169,14 @@ function parseCsv(text: string): Record<string, string>[] {
         .map((items) => Object.fromEntries(headers.map((header, index) => [header, items[index] ?? ''])));
 }
 
-function csvRowToInquiry(row: Record<string, string>, programs: Option[], teamMembers: Option[]): InquiryForm {
+function csvRowToInquiry(
+    row: Record<string, string>,
+    programs: Option[],
+    campuses: Option[],
+    teamMembers: Option[],
+): InquiryForm {
     const programName = row.program ?? row.program_name ?? '';
+    const campusName = row.campus ?? row.campus_name ?? row.branch ?? row.location ?? '';
     const assignedName = row.assigned_user ?? row.assigned ?? '';
 
     return {
@@ -962,7 +1190,11 @@ function csvRowToInquiry(row: Record<string, string>, programs: Option[], teamMe
         program_id:
             row.program_id ??
             String(programs.find((program) => program.name.toLowerCase() === programName.toLowerCase())?.id ?? ''),
-        previous_program: row.previous_program ?? '',
+        previous_program: row.previous_program ?? row.previous_program_name ?? row.old_program ?? '',
+        campus_id:
+            row.campus_id ??
+            String(campuses.find((campus) => campus.name.toLowerCase() === campusName.toLowerCase())?.id ?? ''),
+        campus: campusName,
         status: row.status || 'pending',
         assigned_user_id:
             row.assigned_user_id ??

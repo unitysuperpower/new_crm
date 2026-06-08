@@ -33,9 +33,11 @@ enum UserRole: string
                 UserPermission::UpdateAssignedInquiry,
                 UserPermission::CreateInquiryStream,
                 UserPermission::ManageProgram,
+                UserPermission::ManageCampus,
             ],
             self::User => [
                 UserPermission::ViewInquiry,
+                UserPermission::CreateInquiry,
                 UserPermission::UpdateAssignedInquiry,
                 UserPermission::CreateInquiryStream,
             ],

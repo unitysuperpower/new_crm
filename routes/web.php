@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CampusController;
 use App\Http\Controllers\InquiryController;
 use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\StreamController;
@@ -14,6 +15,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('programs', [ProgramController::class, 'store'])->name('programs.store');
     Route::patch('programs/{program}', [ProgramController::class, 'update'])->name('programs.update');
     Route::delete('programs/{program}', [ProgramController::class, 'destroy'])->name('programs.destroy');
+    Route::get('campuses', [CampusController::class, 'index'])->name('campuses.index');
+    Route::post('campuses', [CampusController::class, 'store'])->name('campuses.store');
+    Route::patch('campuses/{campus}/toggle', [CampusController::class, 'toggle'])->name('campuses.toggle');
+    Route::patch('campuses/{campus}', [CampusController::class, 'update'])->name('campuses.update');
+    Route::delete('campuses/{campus}', [CampusController::class, 'destroy'])->name('campuses.destroy');
     Route::post('inquiries', [InquiryController::class, 'store'])->name('inquiries.store');
     Route::post('inquiries/import', [InquiryController::class, 'import'])->name('inquiries.import');
     Route::patch('inquiries/assign', [InquiryController::class, 'assign'])->name('inquiries.assign');

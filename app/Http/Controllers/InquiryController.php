@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreInquiryRequest;
 use App\Http\Requests\UpdateInquiryRequest;
+use App\Models\Campus;
 use App\Models\Inquiry;
 use App\Models\Program;
 use App\Models\User;
@@ -44,29 +45,47 @@ class InquiryController extends Controller
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
+            'scope' => ['nullable', Rule::in(['all', 'assigned_to_me'])],
             'status' => ['nullable', Rule::in(self::STATUSES)],
             'department' => ['nullable', Rule::in(self::DEPARTMENTS)],
             'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'source' => ['nullable', 'string', 'max:255'],
+            'campus_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('campuses', 'id')->where('is_active', true),
+            ],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
 
         $inquiries = Inquiry::query()
-            ->with(['program:id,name', 'assignedUser:id,name', 'streams.user:id,name'])
+            ->with(['program:id,name', 'campusModel:id,name', 'assignedUser:id,name', 'streams.user:id,name'])
+            ->where(function ($query) {
+                $query->whereNull('campus_id')
+                    ->orWhereHas('campusModel', fn ($campusQuery) => $campusQuery->where('is_active', true));
+            })
+            ->when(
+                ($filters['scope'] ?? 'all') === 'assigned_to_me',
+                fn ($query) => $query->where('assigned_user_id', $request->user()->id),
+            )
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('name', 'like', "%{$search}%")
                         ->orWhere('phone', 'like', "%{$search}%")
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('city', 'like', "%{$search}%")
-                        ->orWhere('source', 'like', "%{$search}%");
+                        ->orWhere('source', 'like', "%{$search}%")
+                        ->orWhere('previous_program', 'like', "%{$search}%")
+                        ->orWhere('campus', 'like', "%{$search}%")
+                        ->orWhereHas('campusModel', fn ($campusQuery) => $campusQuery->where('name', 'like', "%{$search}%"));
                 });
             })
             ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
             ->when($filters['department'] ?? null, fn ($query, string $department) => $query->where('department', $department))
             ->when($filters['assigned_user_id'] ?? null, fn ($query, int $userId) => $query->where('assigned_user_id', $userId))
             ->when($filters['source'] ?? null, fn ($query, string $source) => $query->where('source', $source))
+            ->when($filters['campus_id'] ?? null, fn ($query, int $campusId) => $query->where('campus_id', $campusId))
             ->when($filters['date_from'] ?? null, fn ($query, string $dateFrom) => $query->whereDate('created_at', '>=', $dateFrom))
             ->when($filters['date_to'] ?? null, fn ($query, string $dateTo) => $query->whereDate('created_at', '<=', $dateTo))
             ->latest()
@@ -78,17 +97,26 @@ class InquiryController extends Controller
             'pageUrl' => $request->routeIs('inquiries.index') ? '/inquiries' : '/dashboard',
             'filters' => [
                 'search' => $filters['search'] ?? '',
+                'scope' => $filters['scope'] ?? 'all',
                 'status' => $filters['status'] ?? '',
                 'department' => $filters['department'] ?? '',
                 'assigned_user_id' => $filters['assigned_user_id'] ?? '',
                 'source' => $filters['source'] ?? '',
+                'campus_id' => $filters['campus_id'] ?? '',
                 'date_from' => $filters['date_from'] ?? '',
                 'date_to' => $filters['date_to'] ?? '',
             ],
             'inquiries' => $inquiries,
             'programs' => Program::query()->orderBy('name')->get(['id', 'name']),
+            'campuses' => Campus::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'is_active']),
             'teamMembers' => User::query()->orderBy('name')->get(['id', 'name']),
             'sourceOptions' => Inquiry::query()
+                ->where(function ($query) {
+                    $query->whereNull('campus_id')
+                        ->orWhereHas('campusModel', fn ($campusQuery) => $campusQuery->where('is_active', true));
+                })
                 ->whereNotNull('source')
                 ->distinct()
                 ->orderBy('source')
@@ -100,6 +128,7 @@ class InquiryController extends Controller
                 'canCreateInquiry' => $request->user()->can('create', Inquiry::class),
                 'canImportInquiry' => $request->user()->can('import', Inquiry::class),
                 'canAssignInquiry' => $request->user()->can('assign', Inquiry::class),
+                'canManageCampus' => $request->user()->can('update', new Campus),
             ],
         ]);
     }
@@ -127,6 +156,11 @@ class InquiryController extends Controller
             'rows.*.source' => ['nullable', 'string', 'max:255'],
             'rows.*.program_id' => ['nullable', 'exists:programs,id'],
             'rows.*.previous_program' => ['nullable', 'string', 'max:255'],
+            'rows.*.campus' => ['nullable', 'string', 'max:255'],
+            'rows.*.campus_id' => [
+                'nullable',
+                Rule::exists('campuses', 'id')->where('is_active', true),
+            ],
             'rows.*.status' => ['required', Rule::in(self::STATUSES)],
             'rows.*.assigned_user_id' => ['nullable', 'exists:users,id'],
             'rows.*.department' => ['required', Rule::in(self::DEPARTMENTS)],
@@ -136,6 +170,12 @@ class InquiryController extends Controller
 
         DB::transaction(function () use ($validated) {
             foreach ($validated['rows'] as $row) {
+                if (empty($row['campus_id']) && ! empty($row['campus'])) {
+                    $row['campus_id'] = Campus::query()->firstOrCreate([
+                        'name' => $row['campus'],
+                    ])->id;
+                }
+
                 Inquiry::create($row);
             }
         });
@@ -180,6 +220,9 @@ class InquiryController extends Controller
             'program_id' => $inquiry->program_id,
             'program' => $inquiry->program?->only(['id', 'name']),
             'previous_program' => $inquiry->previous_program,
+            'campus_id' => $inquiry->campus_id,
+            'campus_model' => $inquiry->campusModel?->only(['id', 'name']),
+            'campus' => $inquiry->campus,
             'status' => $inquiry->status,
             'assigned_user_id' => $inquiry->assigned_user_id,
             'assigned_user' => $inquiry->assignedUser?->only(['id', 'name']),

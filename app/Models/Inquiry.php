@@ -22,6 +22,8 @@ class Inquiry extends Model
         'source',
         'program_id',
         'previous_program',
+        'campus',
+        'campus_id',
         'status',
         'assigned_user_id',
         'department',
@@ -39,6 +41,11 @@ class Inquiry extends Model
     public function program(): BelongsTo
     {
         return $this->belongsTo(Program::class);
+    }
+
+    public function campusModel(): BelongsTo
+    {
+        return $this->belongsTo(Campus::class, 'campus_id');
     }
 
     public function assignedUser(): BelongsTo

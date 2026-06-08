@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Inquiry;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreInquiryRequest extends FormRequest
 {
@@ -32,6 +33,11 @@ class StoreInquiryRequest extends FormRequest
             'source' => ['nullable', 'string', 'max:255'],
             'program_id' => ['nullable', 'exists:programs,id'],
             'previous_program' => ['nullable', 'string', 'max:255'],
+            'campus' => ['nullable', 'string', 'max:255'],
+            'campus_id' => [
+                'nullable',
+                Rule::exists('campuses', 'id')->where('is_active', true),
+            ],
             'status' => ['required', 'string', 'in:pending,not sure,not interested,not eligible,interested,call back,distance problem,not responding,for job,will visit,visited,p.o,online/short course,e-t paid,admission fee paid,master calsses'],
             'assigned_user_id' => ['nullable', 'exists:users,id'],
             'department' => ['required', 'string', 'in:admission,academics,accouts'],

@@ -1,0 +1,8 @@
+version: "2"
+authtoken: ""
+
+tunnels:
+  crm:
+    proto: http
+    addr: 80
+    bind_tls: true

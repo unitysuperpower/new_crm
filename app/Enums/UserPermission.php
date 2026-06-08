@@ -15,6 +15,7 @@ enum UserPermission: string
     case CreateInquiryStream = 'inquiry-stream:create';
 
     case ManageProgram = 'program:manage';
+    case ManageCampus = 'campus:manage';
 
     public function label(): string
     {
@@ -28,6 +29,7 @@ enum UserPermission: string
             self::UpdateAssignedInquiry => 'Update assigned inquiries',
             self::CreateInquiryStream => 'Add inquiry streams',
             self::ManageProgram => 'Manage programs',
+            self::ManageCampus => 'Manage campuses',
         };
     }
 }

@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     libfreetype6-dev \
     libjpeg62-turbo-dev \
     libpng-dev \
+    libicu-dev \
     && docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install \
     pdo \
@@ -18,9 +19,14 @@ RUN apt-get update && apt-get install -y \
     mysqli \
     zip \
     gd \
+    intl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY . /var/www/html
+
+# Install composer dependencies
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer && \
+    composer install --optimize-autoloader
 
 ENV DB_HOST=db
 ENV DB_PORT=3306
