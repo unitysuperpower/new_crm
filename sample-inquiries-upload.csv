@@ -1,0 +1,6 @@
+name,phone,email,city,address,source,program,assigned_user,previous_program,status,department,next_follow_up_at,message
+Ali Khan,03001234567,ali.khan@example.com,Lahore,"House 12, Model Town",Facebook,Web Development,,Computer Basics,pending,admission,2026-06-10,"Asked about class timing and admission fee."
+Sara Ahmed,03111234567,sara.ahmed@example.com,Karachi,"Block 5, Gulshan-e-Iqbal",Website,Graphic Design,,,"interested",admission,2026-06-12,"Wants weekend classes and installment details."
+Usman Raza,03211234567,usman.raza@example.com,Islamabad,"Street 4, G-10",WhatsApp,Digital Marketing,,MS Office,"call back",admission,2026-06-09,"Requested call after 5 PM."
+Hina Malik,03331234567,hina.malik@example.com,Multan,"Near Cantt Market",Walk-in,English Language,,,"will visit",admission,2026-06-15,"Plans to visit campus with parents."
+Bilal Hussain,03451234567,bilal.hussain@example.com,Faisalabad,"People's Colony",Referral,Spoken English,,,"not responding",admission,2026-06-11,"Called twice, no response yet."
