@@ -10,6 +10,16 @@ Route::inertia('/', 'welcome')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [InquiryController::class, 'index'])->name('dashboard');
+    Route::inertia('documentation', 'documentation/index')->name('documentation.index');
+    Route::get('documentation/sample-inquiries-upload.csv', function () {
+        $path = base_path('sample-inquiries-upload.csv');
+
+        abort_unless(file_exists($path), 404);
+
+        return response()->download($path, 'sample-inquiries-upload.csv', [
+            'Content-Type' => 'text/csv',
+        ]);
+    })->name('documentation.sample-inquiries');
     Route::get('inquiries', [InquiryController::class, 'index'])->name('inquiries.index');
     Route::get('programs', [ProgramController::class, 'index'])->name('programs.index');
     Route::post('programs', [ProgramController::class, 'store'])->name('programs.store');

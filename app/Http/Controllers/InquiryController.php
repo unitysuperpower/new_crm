@@ -39,6 +39,8 @@ class InquiryController extends Controller
 
     private const DEPARTMENTS = ['admission', 'academics', 'accouts'];
 
+
+    //Dashboard and Inquiry List share the same index method to allow users to quickly access their assigned inquiries from the dashboard while still providing a comprehensive view of all inquiries in the inquiry list page.
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Inquiry::class);
@@ -142,6 +144,7 @@ class InquiryController extends Controller
         return back()->with('success', 'Inquiry created.');
     }
 
+    // The import method allows authorized users to bulk import multiple inquiries at once, significantly reducing the time and effort required to add large volumes of inquiries into the system, especially when migrating from another platform or onboarding a new batch of leads.
     public function import(Request $request): RedirectResponse
     {
         Gate::authorize('import', Inquiry::class);
@@ -183,6 +186,7 @@ class InquiryController extends Controller
         return back()->with('success', count($validated['rows']).' inquiries imported.');
     }
 
+    // The assign method allows authorized users to bulk assign multiple inquiries to a specific team member, streamlining the workflow and ensuring that inquiries are promptly attended to by the appropriate staff.
     public function assign(Request $request): RedirectResponse
     {
         Gate::authorize('assign', Inquiry::class);
@@ -200,6 +204,7 @@ class InquiryController extends Controller
         return back()->with('success', count($validated['inquiry_ids']).' inquiries assigned.');
     }
 
+    // The update method allows authorized users to modify the details of an existing inquiry, ensuring that the information remains accurate and up-to-date as the inquiry progresses through different stages of engagement.
     public function update(UpdateInquiryRequest $request, Inquiry $inquiry): RedirectResponse
     {
         $inquiry->update($request->validated());
@@ -207,6 +212,8 @@ class InquiryController extends Controller
         return back()->with('success', 'Inquiry updated.');
     }
 
+
+    // The serializeInquiry method transforms an Inquiry model instance into a structured array format suitable for frontend consumption, including related data and permission flags, ensuring that the frontend receives all necessary information in a consistent and optimized manner for rendering inquiry details and associated actions.
     private function serializeInquiry(Inquiry $inquiry, User $user): array
     {
         return [

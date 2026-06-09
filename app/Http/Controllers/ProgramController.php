@@ -13,6 +13,8 @@ use Inertia\Response;
 
 class ProgramController extends Controller
 {
+
+// The index method retrieves and displays a list of programs, allowing for optional search filtering, and provides metrics on the total number of programs, those with inquiries, and those without inquiries, while ensuring that the user has the necessary permissions to view the programs.
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Program::class);
@@ -52,6 +54,7 @@ class ProgramController extends Controller
         ]);
     }
 
+    // The store method handles the creation of a new program by validating the incoming request data, creating a new Program record in the database, and then redirecting back to the previous page with a success message, ensuring that only authorized users can perform this action.
     public function store(StoreProgramRequest $request): RedirectResponse
     {
         Program::create($request->validated());
@@ -59,6 +62,7 @@ class ProgramController extends Controller
         return back()->with('success', 'Program created.');
     }
 
+    // The update method allows authorized users to modify the details of an existing program, ensuring that the information remains accurate and up-to-date as the program progresses through different stages of development.
     public function update(UpdateProgramRequest $request, Program $program): RedirectResponse
     {
         $program->update($request->validated());
@@ -66,6 +70,7 @@ class ProgramController extends Controller
         return back()->with('success', 'Program updated.');
     }
 
+    // The destroy method allows authorized users to delete a program, but only if it has no associated inquiries, ensuring data integrity and preventing accidental deletion of programs that are currently in use.
     public function destroy(Program $program): RedirectResponse
     {
         Gate::authorize('delete', $program);

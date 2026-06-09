@@ -1,5 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
-import { BookOpen, ClipboardList, FolderGit2, GraduationCap, LayoutGrid } from 'lucide-react';
+import { BookOpen, ClipboardList, FolderGit2, GraduationCap, LayoutGrid, Moon, Sun } from 'lucide-react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
@@ -13,15 +13,17 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
+import { useAppearance } from '@/hooks/use-appearance';
 import type { NavItem } from '@/types';
 
 export function AppSidebar() {
     const dashboardUrl = '/dashboard';
     const { auth } = usePage().props;
-    const permissions = auth.user?.permissions ?? [];
+    const permissions = auth.user?.permissions ?? [auth.user?.permissions].flat();
     const canViewInquiries = permissions.includes('inquiry:view');
     const canManagePrograms = permissions.includes('program:manage');
     const canManageCampuses = permissions.includes('campus:manage');
+    const canManageUsers = permissions.includes('user:manage');
 
     const mainNavItems: NavItem[] = [
         canViewInquiries && {
@@ -44,17 +46,17 @@ export function AppSidebar() {
             href: '/campuses',
             icon: FolderGit2,
         },
+        canManageUsers && {
+            title: 'Users',
+            href: '/users',
+            icon: FolderGit2,
+        },
     ].filter(Boolean) as NavItem[];
 
     const footerNavItems: NavItem[] = [
         {
-            title: 'Repository',
-            href: 'https://github.com/laravel/react-starter-kit',
-            icon: FolderGit2,
-        },
-        {
-            title: 'Documentation',
-            href: 'https://laravel.com/docs/starter-kits#react',
+            title: 'Project Docs',
+            href: '/documentation',
             icon: BookOpen,
         },
     ];
@@ -78,9 +80,31 @@ export function AppSidebar() {
             </SidebarContent>
 
             <SidebarFooter>
+                <SidebarThemeToggle />
                 <NavFooter items={footerNavItems} className="mt-auto" />
                 <NavUser />
             </SidebarFooter>
         </Sidebar>
+    );
+}
+
+function SidebarThemeToggle() {
+    const { resolvedAppearance, updateAppearance } = useAppearance();
+    const nextAppearance = resolvedAppearance === 'dark' ? 'light' : 'dark';
+    const label = resolvedAppearance === 'dark' ? 'Light mode' : 'Dark mode';
+
+    return (
+        <SidebarMenu>
+            <SidebarMenuItem>
+                <SidebarMenuButton
+                    type="button"
+                    tooltip={{ children: label }}
+                    onClick={() => updateAppearance(nextAppearance)}
+                >
+                    {resolvedAppearance === 'dark' ? <Sun /> : <Moon />}
+                    <span>{label}</span>
+                </SidebarMenuButton>
+            </SidebarMenuItem>
+        </SidebarMenu>
     );
 }

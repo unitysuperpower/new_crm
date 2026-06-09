@@ -1,3 +1,4 @@
+import { Link } from '@inertiajs/react';
 import type { ComponentPropsWithoutRef } from 'react';
 import {
     SidebarGroup,
@@ -29,16 +30,17 @@ export function NavFooter({
                                 asChild
                                 className="text-neutral-600 hover:text-neutral-800 dark:text-neutral-300 dark:hover:text-neutral-100"
                             >
-                                <a
-                                    href={toUrl(item.href)}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                >
-                                    {item.icon && (
-                                        <item.icon className="h-5 w-5" />
-                                    )}
-                                    <span>{item.title}</span>
-                                </a>
+                                {isExternalHref(toUrl(item.href)) ? (
+                                    <a href={toUrl(item.href)} target="_blank" rel="noopener noreferrer">
+                                        {item.icon && <item.icon className="h-5 w-5" />}
+                                        <span>{item.title}</span>
+                                    </a>
+                                ) : (
+                                    <Link href={item.href}>
+                                        {item.icon && <item.icon className="h-5 w-5" />}
+                                        <span>{item.title}</span>
+                                    </Link>
+                                )}
                             </SidebarMenuButton>
                         </SidebarMenuItem>
                     ))}
@@ -46,4 +48,8 @@ export function NavFooter({
             </SidebarGroupContent>
         </SidebarGroup>
     );
+}
+
+function isExternalHref(href: string) {
+    return href.startsWith('http://') || href.startsWith('https://');
 }

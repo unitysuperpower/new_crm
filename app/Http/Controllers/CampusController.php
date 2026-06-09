@@ -13,6 +13,7 @@ use Inertia\Response;
 
 class CampusController extends Controller
 {
+    // The index method retrieves and displays a list of campuses, allowing for optional search filtering, and provides metrics on the total number of campuses, those with inquiries, and those without inquiries, while ensuring that the user has the necessary permissions to view the campuses.
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Campus::class);
@@ -56,13 +57,14 @@ class CampusController extends Controller
         ]);
     }
 
+    // The store method handles the creation of a new campus by validating the incoming request data, creating a new Campus record in the database, and then redirecting back to the previous page with a success message, ensuring that only authorized users can perform this action.
     public function store(StoreCampusRequest $request): RedirectResponse
     {
         Campus::create($request->validated());
 
         return back()->with('success', 'Campus created.');
     }
-
+    // The update method allows authorized users to modify the details of an existing campus, ensuring that the information remains accurate and up-to-date as the campus progresses through different stages of development.                       
     public function update(UpdateCampusRequest $request, Campus $campus): RedirectResponse
     {
         $campus->update($request->validated());
@@ -70,6 +72,7 @@ class CampusController extends Controller
         return back()->with('success', 'Campus updated.');
     }
 
+    // The toggle method allows authorized users to enable or disable a campus by updating its active status, ensuring that the campus can be easily managed without needing to delete it, and providing feedback on the action taken.
     public function toggle(Request $request, Campus $campus): RedirectResponse
     {
         Gate::authorize('update', $campus);
@@ -83,6 +86,7 @@ class CampusController extends Controller
         return back()->with('success', $campus->is_active ? 'Campus enabled.' : 'Campus disabled.');
     }
 
+    // The destroy method allows authorized users to delete a campus, ensuring that the campus has no associated inquiries before proceeding, and providing feedback on the action taken.
     public function destroy(Campus $campus): RedirectResponse
     {
         Gate::authorize('delete', $campus);
