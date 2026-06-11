@@ -8,8 +8,13 @@ use App\Models\Campus;
 use App\Models\Inquiry;
 use App\Models\Program;
 use App\Models\User;
+use Dompdf\Dompdf;
+use Dompdf\Options;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\Rule;
@@ -39,15 +44,12 @@ class InquiryController extends Controller
 
     private const DEPARTMENTS = ['admission', 'academics', 'accouts'];
 
-
-    //Dashboard and Inquiry List share the same index method to allow users to quickly access their assigned inquiries from the dashboard while still providing a comprehensive view of all inquiries in the inquiry list page.
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Inquiry::class);
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'scope' => ['nullable', Rule::in(['all', 'assigned_to_me'])],
             'status' => ['nullable', Rule::in(self::STATUSES)],
             'department' => ['nullable', Rule::in(self::DEPARTMENTS)],
             'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -61,14 +63,16 @@ class InquiryController extends Controller
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
 
-        $inquiries = Inquiry::query()
+        $isInquiryPage = $request->routeIs('inquiries.index');
+
+        $query = Inquiry::query()
             ->with(['program:id,name', 'campusModel:id,name', 'assignedUser:id,name', 'streams.user:id,name'])
             ->where(function ($query) {
                 $query->whereNull('campus_id')
                     ->orWhereHas('campusModel', fn ($campusQuery) => $campusQuery->where('is_active', true));
             })
             ->when(
-                ($filters['scope'] ?? 'all') === 'assigned_to_me',
+                $isInquiryPage,
                 fn ($query) => $query->where('assigned_user_id', $request->user()->id),
             )
             ->when($filters['search'] ?? null, function ($query, string $search) {
@@ -85,30 +89,46 @@ class InquiryController extends Controller
             })
             ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
             ->when($filters['department'] ?? null, fn ($query, string $department) => $query->where('department', $department))
-            ->when($filters['assigned_user_id'] ?? null, fn ($query, int $userId) => $query->where('assigned_user_id', $userId))
+            ->when(
+                ! $isInquiryPage && ($filters['assigned_user_id'] ?? null),
+                fn ($query) => $query->where('assigned_user_id', $filters['assigned_user_id']),
+            )
             ->when($filters['source'] ?? null, fn ($query, string $source) => $query->where('source', $source))
             ->when($filters['campus_id'] ?? null, fn ($query, int $campusId) => $query->where('campus_id', $campusId))
             ->when($filters['date_from'] ?? null, fn ($query, string $dateFrom) => $query->whereDate('created_at', '>=', $dateFrom))
             ->when($filters['date_to'] ?? null, fn ($query, string $dateTo) => $query->whereDate('created_at', '<=', $dateTo))
-            ->latest()
-            ->get()
-            ->map(fn (Inquiry $inquiry) => $this->serializeInquiry($inquiry, $request->user()));
+            ->latest();
+
+        $paginatedInquiries = $query->paginate(15)->withQueryString();
+        $inquiries = $paginatedInquiries->getCollection()
+            ->map(fn (Inquiry $inquiry) => $this->serializeInquiry($inquiry, $request->user()))
+            ->values();
 
         return Inertia::render('dashboard', [
-            'pageTitle' => $request->routeIs('inquiries.index') ? 'Inquiries' : 'Dashboard',
-            'pageUrl' => $request->routeIs('inquiries.index') ? '/inquiries' : '/dashboard',
+            'pageTitle' => $isInquiryPage ? 'Inquiries' : 'Dashboard',
+            'pageUrl' => $isInquiryPage ? '/inquiries' : '/dashboard',
+            'pageMode' => $isInquiryPage ? 'assigned' : 'all',
             'filters' => [
                 'search' => $filters['search'] ?? '',
-                'scope' => $filters['scope'] ?? 'all',
                 'status' => $filters['status'] ?? '',
                 'department' => $filters['department'] ?? '',
-                'assigned_user_id' => $filters['assigned_user_id'] ?? '',
+                'assigned_user_id' => $isInquiryPage ? '' : ($filters['assigned_user_id'] ?? ''),
                 'source' => $filters['source'] ?? '',
                 'campus_id' => $filters['campus_id'] ?? '',
                 'date_from' => $filters['date_from'] ?? '',
                 'date_to' => $filters['date_to'] ?? '',
             ],
             'inquiries' => $inquiries,
+            'pagination' => [
+                'current_page' => $paginatedInquiries->currentPage(),
+                'from' => $paginatedInquiries->firstItem(),
+                'last_page' => $paginatedInquiries->lastPage(),
+                'next_page_url' => $paginatedInquiries->nextPageUrl(),
+                'per_page' => $paginatedInquiries->perPage(),
+                'prev_page_url' => $paginatedInquiries->previousPageUrl(),
+                'to' => $paginatedInquiries->lastItem(),
+                'total' => $paginatedInquiries->total(),
+            ],
             'programs' => Program::query()->orderBy('name')->get(['id', 'name']),
             'campuses' => Campus::query()
                 ->orderBy('name')
@@ -142,6 +162,40 @@ class InquiryController extends Controller
         Inquiry::create($request->validated());
 
         return back()->with('success', 'Inquiry created.');
+    }
+
+    public function report(Request $request): JsonResponse
+    {
+        Gate::authorize('viewAny', Inquiry::class);
+
+        $filters = $this->validateReportFilters($request);
+        $inquiries = $this->reportQuery($request, $filters)->get();
+
+        return response()->json($this->reportPayload($inquiries, $filters));
+    }
+
+    public function reportPdf(Request $request): HttpResponse
+    {
+        Gate::authorize('viewAny', Inquiry::class);
+
+        $filters = $this->validateReportFilters($request);
+        $inquiries = $this->reportQuery($request, $filters)->get();
+        $payload = $this->reportPayload($inquiries, $filters);
+
+        $options = new Options;
+        $options->set('defaultFont', 'DejaVu Sans');
+
+        $pdf = new Dompdf($options);
+        $pdf->loadHtml(view('reports.inquiries', $payload)->render());
+        $pdf->setPaper('a4', 'landscape');
+        $pdf->render();
+
+        $filename = 'assigned-inquiries-report-'.now()->format('Y-m-d-His').'.pdf';
+
+        return response($pdf->output(), 200, [
+            'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Type' => 'application/pdf',
+        ]);
     }
 
     // The import method allows authorized users to bulk import multiple inquiries at once, significantly reducing the time and effort required to add large volumes of inquiries into the system, especially when migrating from another platform or onboarding a new batch of leads.
@@ -212,7 +266,6 @@ class InquiryController extends Controller
         return back()->with('success', 'Inquiry updated.');
     }
 
-
     // The serializeInquiry method transforms an Inquiry model instance into a structured array format suitable for frontend consumption, including related data and permission flags, ensuring that the frontend receives all necessary information in a consistent and optimized manner for rendering inquiry details and associated actions.
     private function serializeInquiry(Inquiry $inquiry, User $user): array
     {
@@ -243,6 +296,75 @@ class InquiryController extends Controller
                 'response' => $stream->response,
                 'user' => $stream->user?->only(['id', 'name']),
                 'created_at' => $stream->created_at?->format('M d, Y h:i A'),
+            ])->values(),
+        ];
+    }
+
+    private function validateReportFilters(Request $request): array
+    {
+        return $request->validate([
+            'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
+            'status' => ['nullable', Rule::in(self::STATUSES)],
+            'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
+    }
+
+    private function reportQuery(Request $request, array $filters): Builder
+    {
+        $canSelectUser = $request->user()->can('assign', Inquiry::class);
+
+        return Inquiry::query()
+            ->with(['program:id,name', 'campusModel:id,name', 'assignedUser:id,name'])
+            ->whereNotNull('assigned_user_id')
+            ->where(function (Builder $query) {
+                $query->whereNull('campus_id')
+                    ->orWhereHas('campusModel', fn (Builder $campusQuery) => $campusQuery->where('is_active', true));
+            })
+            ->when(
+                $canSelectUser,
+                fn (Builder $query) => $query->when(
+                    $filters['assigned_user_id'] ?? null,
+                    fn (Builder $inner, int $userId) => $inner->where('assigned_user_id', $userId),
+                ),
+                fn (Builder $query) => $query->where('assigned_user_id', $request->user()->id),
+            )
+            ->when($filters['campus_id'] ?? null, fn (Builder $query, int $campusId) => $query->where('campus_id', $campusId))
+            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
+            ->when($filters['date_from'] ?? null, fn (Builder $query, string $date) => $query->whereDate('updated_at', '>=', $date))
+            ->when($filters['date_to'] ?? null, fn (Builder $query, string $date) => $query->whereDate('updated_at', '<=', $date))
+            ->latest('updated_at');
+    }
+
+    private function reportPayload($inquiries, array $filters): array
+    {
+        return [
+            'generatedAt' => now()->format('M d, Y h:i A'),
+            'filters' => [
+                'campus' => isset($filters['campus_id']) ? Campus::find($filters['campus_id'])?->name : null,
+                'status' => $filters['status'] ?? null,
+                'user' => isset($filters['assigned_user_id']) ? User::find($filters['assigned_user_id'])?->name : null,
+                'dateFrom' => $filters['date_from'] ?? null,
+                'dateTo' => $filters['date_to'] ?? null,
+            ],
+            'statusCounts' => $inquiries
+                ->countBy('status')
+                ->filter(fn (int $count) => $count > 0)
+                ->sortDesc()
+                ->all(),
+            'total' => $inquiries->count(),
+            'inquiries' => $inquiries->map(fn (Inquiry $inquiry) => [
+                'id' => $inquiry->id,
+                'name' => $inquiry->name,
+                'phone' => $inquiry->phone,
+                'email' => $inquiry->email,
+                'program' => $inquiry->program?->name,
+                'campus' => $inquiry->campusModel?->name ?? $inquiry->campus,
+                'assigned_user' => $inquiry->assignedUser?->name,
+                'status' => $inquiry->status,
+                'department' => $inquiry->department,
+                'updated_at' => $inquiry->updated_at?->format('M d, Y h:i A'),
             ])->values(),
         ];
     }

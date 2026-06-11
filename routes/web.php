@@ -21,6 +21,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('documentation.sample-inquiries');
     Route::get('inquiries', [InquiryController::class, 'index'])->name('inquiries.index');
+    Route::get('inquiries/report', [InquiryController::class, 'report'])->name('inquiries.report');
+    Route::get('inquiries/report/pdf', [InquiryController::class, 'reportPdf'])->name('inquiries.report.pdf');
     Route::get('programs', [ProgramController::class, 'index'])->name('programs.index');
     Route::post('programs', [ProgramController::class, 'store'])->name('programs.store');
     Route::patch('programs/{program}', [ProgramController::class, 'update'])->name('programs.update');
