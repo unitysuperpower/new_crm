@@ -1,6 +1,15 @@
 import { FormEvent, useState } from 'react';
 import { Head, router } from '@inertiajs/react';
-import { Building2, Edit3, MapPin, Power, PowerOff, Plus, Search, Trash2 } from 'lucide-react';
+import {
+    Building2,
+    Edit3,
+    MapPin,
+    Power,
+    PowerOff,
+    Plus,
+    Search,
+    Trash2,
+} from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -117,14 +126,18 @@ export default function CampusesIndex({
     };
 
     const toggleCampus = (campus: Campus) => {
-        setTogglingCampusIds((current) => [...new Set([...current, campus.id])]);
+        setTogglingCampusIds((current) => [
+            ...new Set([...current, campus.id]),
+        ]);
         router.patch(
             `/campuses/${campus.id}/toggle`,
             { is_active: !campus.is_active },
             {
                 preserveScroll: true,
                 onFinish: () => {
-                    setTogglingCampusIds((current) => current.filter((id) => id !== campus.id));
+                    setTogglingCampusIds((current) =>
+                        current.filter((id) => id !== campus.id),
+                    );
                 },
             },
         );
@@ -133,12 +146,13 @@ export default function CampusesIndex({
     return (
         <>
             <Head title="Campuses" />
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="crm-page">
+                <div className="crm-page-header">
                     <div>
-                        <h1 className="text-xl font-semibold">Campuses</h1>
-                        <p className="text-muted-foreground text-sm">
-                            Manage campus options used by inquiries and CSV imports.
+                        <h1 className="crm-page-title">Campuses</h1>
+                        <p className="crm-page-description">
+                            Manage campus options used by inquiries and CSV
+                            imports.
                         </p>
                     </div>
                     <Button type="button" onClick={openCreate}>
@@ -151,25 +165,33 @@ export default function CampusesIndex({
                     <Metric label="Total campuses" value={metrics.total} />
                     <Metric label="Visible" value={metrics.active} />
                     <Metric label="Hidden" value={metrics.inactive} />
-                    <Metric label="Used by inquiries" value={metrics.withInquiries} />
+                    <Metric
+                        label="Used by inquiries"
+                        value={metrics.withInquiries}
+                    />
                 </div>
 
-                <div className="rounded-lg border bg-background">
+                <div className="crm-panel">
                     <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
-                        <form className="relative w-full md:max-w-md" onSubmit={submitSearch}>
-                            <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
+                        <form
+                            className="relative w-full md:max-w-md"
+                            onSubmit={submitSearch}
+                        >
+                            <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
                             <Input
                                 className="pl-9"
                                 value={search}
                                 placeholder="Search campuses, city, or address"
-                                onChange={(event) => setSearch(event.target.value)}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
                             />
                         </form>
                     </div>
 
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-[760px] text-sm">
-                            <thead className="bg-muted/60 text-muted-foreground">
+                            <thead className="bg-muted text-muted-foreground">
                                 <tr>
                                     <Th>Campus</Th>
                                     <Th>City</Th>
@@ -182,53 +204,103 @@ export default function CampusesIndex({
                             </thead>
                             <tbody>
                                 {campuses.map((campus) => (
-                                    <tr key={campus.id} className="border-t">
+                                    <tr
+                                        key={campus.id}
+                                        className="crm-table-row"
+                                    >
                                         <Td>
-                                            <div className="flex items-center gap-2 font-medium">
-                                                <Building2 className="text-muted-foreground size-4" />
+                                            <div className="flex items-center gap-2 font-semibold">
+                                                <span className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                                    <Building2 className="size-4" />
+                                                </span>
                                                 {campus.name}
                                             </div>
                                         </Td>
                                         <Td>{campus.city || 'Not set'}</Td>
                                         <Td>
                                             <div className="flex max-w-md items-start gap-2">
-                                                <MapPin className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-                                                <span>{campus.address || 'No address'}</span>
+                                                <MapPin className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                                                <span>
+                                                    {campus.address ||
+                                                        'No address'}
+                                                </span>
                                             </div>
                                         </Td>
                                         <Td>
-                                            <Badge variant={campus.is_active ? 'secondary' : 'outline'}>
-                                                {campus.is_active ? 'Visible' : 'Hidden'}
+                                            <Badge
+                                                variant={
+                                                    campus.is_active
+                                                        ? 'secondary'
+                                                        : 'outline'
+                                                }
+                                            >
+                                                {campus.is_active
+                                                    ? 'Visible'
+                                                    : 'Hidden'}
                                             </Badge>
                                         </Td>
                                         <Td>
-                                            <Badge variant={campus.inquiries_count > 0 ? 'secondary' : 'outline'}>
+                                            <Badge
+                                                variant={
+                                                    campus.inquiries_count > 0
+                                                        ? 'secondary'
+                                                        : 'outline'
+                                                }
+                                            >
                                                 {campus.inquiries_count}
                                             </Badge>
                                         </Td>
-                                        <Td>{campus.created_at ?? 'Not available'}</Td>
                                         <Td>
-                                            <div className="flex justify-end gap-2">
+                                            {campus.created_at ??
+                                                'Not available'}
+                                        </Td>
+                                        <Td>
+                                            <div className="flex justify-end gap-1">
                                                 <Button
                                                     type="button"
-                                                    variant={campus.is_active ? 'outline' : 'secondary'}
+                                                    variant={
+                                                        campus.is_active
+                                                            ? 'outline'
+                                                            : 'secondary'
+                                                    }
                                                     size="sm"
-                                                    disabled={togglingCampusIds.includes(campus.id)}
-                                                    onClick={() => toggleCampus(campus)}
+                                                    disabled={togglingCampusIds.includes(
+                                                        campus.id,
+                                                    )}
+                                                    onClick={() =>
+                                                        toggleCampus(campus)
+                                                    }
                                                 >
-                                                    {campus.is_active ? <PowerOff /> : <Power />}
-                                                    {campus.is_active ? 'Hide' : 'Show'}
-                                                </Button>
-                                                <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(campus)}>
-                                                    <Edit3 />
-                                                    Edit
+                                                    {campus.is_active ? (
+                                                        <PowerOff />
+                                                    ) : (
+                                                        <Power />
+                                                    )}
+                                                    {campus.is_active
+                                                        ? 'Hide'
+                                                        : 'Show'}
                                                 </Button>
                                                 <Button
                                                     type="button"
                                                     variant="ghost"
                                                     size="sm"
-                                                    disabled={!campus.can_delete}
-                                                    onClick={() => deleteCampus(campus)}
+                                                    onClick={() =>
+                                                        openEdit(campus)
+                                                    }
+                                                >
+                                                    <Edit3 />
+                                                    Edit
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={
+                                                        !campus.can_delete
+                                                    }
+                                                    onClick={() =>
+                                                        deleteCampus(campus)
+                                                    }
                                                 >
                                                     <Trash2 />
                                                     Delete
@@ -239,8 +311,17 @@ export default function CampusesIndex({
                                 ))}
                                 {campuses.length === 0 && (
                                     <tr>
-                                        <td className="text-muted-foreground p-8 text-center" colSpan={7}>
-                                            No campuses found.
+                                        <td
+                                            className="p-8 text-center text-muted-foreground"
+                                            colSpan={7}
+                                        >
+                                            <div className="font-medium text-foreground">
+                                                No campuses found
+                                            </div>
+                                            <div className="mt-1 text-sm">
+                                                Create a campus or adjust your
+                                                search.
+                                            </div>
                                         </td>
                                     </tr>
                                 )}
@@ -253,9 +334,12 @@ export default function CampusesIndex({
             <Dialog open={modalOpen} onOpenChange={setModalOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{editingCampus ? 'Edit campus' : 'Add campus'}</DialogTitle>
+                        <DialogTitle>
+                            {editingCampus ? 'Edit campus' : 'Add campus'}
+                        </DialogTitle>
                         <DialogDescription>
-                            Campus names appear in inquiry forms and CSV imports.
+                            Campus names appear in inquiry forms and CSV
+                            imports.
                         </DialogDescription>
                     </DialogHeader>
                     <form className="space-y-4" onSubmit={submitCampus}>
@@ -274,16 +358,29 @@ export default function CampusesIndex({
                         <div className="grid gap-2">
                             <Label>Address</Label>
                             <textarea
-                                className="border-input focus-visible:border-ring focus-visible:ring-ring/50 min-h-24 rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-[3px]"
+                                className="min-h-24 rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
                                 value={form.address}
-                                onChange={(event) => setForm({ ...form, address: event.target.value })}
+                                onChange={(event) =>
+                                    setForm({
+                                        ...form,
+                                        address: event.target.value,
+                                    })
+                                }
                             />
                         </div>
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setModalOpen(false)}
+                            >
                                 Cancel
                             </Button>
-                            <Button type="submit">{editingCampus ? 'Save changes' : 'Create campus'}</Button>
+                            <Button type="submit">
+                                {editingCampus
+                                    ? 'Save changes'
+                                    : 'Create campus'}
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -294,9 +391,13 @@ export default function CampusesIndex({
 
 function Metric({ label, value }: { label: string; value: number }) {
     return (
-        <div className="rounded-lg border bg-background p-4">
-            <div className="text-muted-foreground text-sm">{label}</div>
-            <div className="mt-1 text-2xl font-semibold">{value}</div>
+        <div className="crm-metric">
+            <div className="text-xs font-medium text-muted-foreground uppercase">
+                {label}
+            </div>
+            <div className="mt-1 text-2xl font-semibold tabular-nums">
+                {value}
+            </div>
         </div>
     );
 }
@@ -331,11 +432,15 @@ function Field({
 }
 
 function Th({ children }: { children?: React.ReactNode }) {
-    return <th className="px-4 py-3 text-left font-medium">{children}</th>;
+    return (
+        <th className="px-4 py-3 text-left text-xs font-semibold">
+            {children}
+        </th>
+    );
 }
 
 function Td({ children }: { children: React.ReactNode }) {
-    return <td className="px-4 py-3 align-top">{children}</td>;
+    return <td className="px-4 py-3.5 align-middle">{children}</td>;
 }
 
 CampusesIndex.layout = () => ({

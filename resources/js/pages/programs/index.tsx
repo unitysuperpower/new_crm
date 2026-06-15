@@ -115,11 +115,11 @@ export default function ProgramsIndex({
     return (
         <>
             <Head title="Programs" />
-            <div className="flex h-full flex-1 flex-col gap-4 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="crm-page">
+                <div className="crm-page-header">
                     <div>
-                        <h1 className="text-xl font-semibold">Programs</h1>
-                        <p className="text-muted-foreground text-sm">
+                        <h1 className="crm-page-title">Programs</h1>
+                        <p className="crm-page-description">
                             Manage course/program options used by inquiries.
                         </p>
                     </div>
@@ -131,26 +131,34 @@ export default function ProgramsIndex({
 
                 <div className="grid gap-3 md:grid-cols-3">
                     <Metric label="Total programs" value={metrics.total} />
-                    <Metric label="Used by inquiries" value={metrics.withInquiries} />
+                    <Metric
+                        label="Used by inquiries"
+                        value={metrics.withInquiries}
+                    />
                     <Metric label="Unused" value={metrics.unused} />
                 </div>
 
-                <div className="rounded-lg border bg-background">
+                <div className="crm-panel">
                     <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
-                        <form className="relative w-full md:max-w-md" onSubmit={submitSearch}>
-                            <Search className="text-muted-foreground absolute top-2.5 left-3 size-4" />
+                        <form
+                            className="relative w-full md:max-w-md"
+                            onSubmit={submitSearch}
+                        >
+                            <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
                             <Input
                                 className="pl-9"
                                 value={search}
                                 placeholder="Search programs or duration"
-                                onChange={(event) => setSearch(event.target.value)}
+                                onChange={(event) =>
+                                    setSearch(event.target.value)
+                                }
                             />
                         </form>
                     </div>
 
-                    <div className="overflow-x-auto">
+                    <div className="relative overflow-x-auto">
                         <table className="w-full min-w-[760px] text-sm">
-                            <thead className="bg-muted/60 text-muted-foreground">
+                            <thead className="bg-muted text-muted-foreground">
                                 <tr>
                                     <Th>Program</Th>
                                     <Th>Duration</Th>
@@ -162,33 +170,58 @@ export default function ProgramsIndex({
                             </thead>
                             <tbody>
                                 {programs.map((program) => (
-                                    <tr key={program.id} className="border-t">
+                                    <tr
+                                        key={program.id}
+                                        className="crm-table-row"
+                                    >
                                         <Td>
-                                            <div className="flex items-center gap-2 font-medium">
-                                                <GraduationCap className="text-muted-foreground size-4" />
+                                            <div className="flex items-center gap-2 font-semibold">
+                                                <span className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                                    <GraduationCap className="size-4" />
+                                                </span>
                                                 {program.name}
                                             </div>
                                         </Td>
                                         <Td>{program.duration || 'Not set'}</Td>
                                         <Td>{formatMoney(program.fee)}</Td>
                                         <Td>
-                                            <Badge variant={program.inquiries_count > 0 ? 'secondary' : 'outline'}>
+                                            <Badge
+                                                variant={
+                                                    program.inquiries_count > 0
+                                                        ? 'secondary'
+                                                        : 'outline'
+                                                }
+                                            >
                                                 {program.inquiries_count}
                                             </Badge>
                                         </Td>
-                                        <Td>{program.created_at ?? 'Not available'}</Td>
                                         <Td>
-                                            <div className="flex justify-end gap-2">
-                                                <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(program)}>
+                                            {program.created_at ??
+                                                'Not available'}
+                                        </Td>
+                                        <Td>
+                                            <div className="flex justify-end gap-1">
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        openEdit(program)
+                                                    }
+                                                >
                                                     <Edit3 />
                                                     Edit
                                                 </Button>
                                                 <Button
                                                     type="button"
-                                                    variant="ghost"
+                                                    variant="outline"
                                                     size="sm"
-                                                    disabled={!program.can_delete}
-                                                    onClick={() => deleteProgram(program)}
+                                                    disabled={
+                                                        !program.can_delete
+                                                    }
+                                                    onClick={() =>
+                                                        deleteProgram(program)
+                                                    }
                                                 >
                                                     <Trash2 />
                                                     Delete
@@ -199,8 +232,17 @@ export default function ProgramsIndex({
                                 ))}
                                 {programs.length === 0 && (
                                     <tr>
-                                        <td className="text-muted-foreground p-8 text-center" colSpan={6}>
-                                            No programs found.
+                                        <td
+                                            className="p-8 text-center text-muted-foreground"
+                                            colSpan={6}
+                                        >
+                                            <div className="font-medium text-foreground">
+                                                No programs found
+                                            </div>
+                                            <div className="mt-1 text-sm">
+                                                Create a program or adjust your
+                                                search.
+                                            </div>
                                         </td>
                                     </tr>
                                 )}
@@ -213,9 +255,12 @@ export default function ProgramsIndex({
             <Dialog open={modalOpen} onOpenChange={setModalOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>{editingProgram ? 'Edit program' : 'Add program'}</DialogTitle>
+                        <DialogTitle>
+                            {editingProgram ? 'Edit program' : 'Add program'}
+                        </DialogTitle>
                         <DialogDescription>
-                            Program names appear in inquiry forms and CSV imports.
+                            Program names appear in inquiry forms and CSV
+                            imports.
                         </DialogDescription>
                     </DialogHeader>
                     <form className="space-y-4" onSubmit={submitProgram}>
@@ -229,7 +274,9 @@ export default function ProgramsIndex({
                             label="Duration"
                             value={form.duration}
                             placeholder="Example: 3 months"
-                            onChange={(duration) => setForm({ ...form, duration })}
+                            onChange={(duration) =>
+                                setForm({ ...form, duration })
+                            }
                         />
                         <Field
                             label="Fee"
@@ -241,10 +288,18 @@ export default function ProgramsIndex({
                             onChange={(fee) => setForm({ ...form, fee })}
                         />
                         <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setModalOpen(false)}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setModalOpen(false)}
+                            >
                                 Cancel
                             </Button>
-                            <Button type="submit">{editingProgram ? 'Save changes' : 'Create program'}</Button>
+                            <Button type="submit">
+                                {editingProgram
+                                    ? 'Save changes'
+                                    : 'Create program'}
+                            </Button>
                         </DialogFooter>
                     </form>
                 </DialogContent>
@@ -255,9 +310,13 @@ export default function ProgramsIndex({
 
 function Metric({ label, value }: { label: string; value: number }) {
     return (
-        <div className="rounded-lg border bg-background p-4">
-            <div className="text-muted-foreground text-sm">{label}</div>
-            <div className="mt-1 text-2xl font-semibold">{value}</div>
+        <div className="crm-metric">
+            <div className="text-xs font-medium text-muted-foreground uppercase">
+                {label}
+            </div>
+            <div className="mt-1 text-2xl font-semibold tabular-nums">
+                {value}
+            </div>
         </div>
     );
 }
@@ -298,11 +357,15 @@ function Field({
 }
 
 function Th({ children }: { children?: React.ReactNode }) {
-    return <th className="px-4 py-3 text-left font-medium">{children}</th>;
+    return (
+        <th className="px-4 py-3 text-left text-xs font-semibold">
+            {children}
+        </th>
+    );
 }
 
 function Td({ children }: { children: React.ReactNode }) {
-    return <td className="px-4 py-3 align-top">{children}</td>;
+    return <td className="px-4 py-3.5 align-middle">{children}</td>;
 }
 
 function formatMoney(value: string) {

@@ -2,13 +2,25 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\UserRole;
 use App\Models\Inquiry;
+use App\Support\InquiryOptions;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreInquiryRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if ($this->user()?->role !== UserRole::SuperAdmin) {
+            $this->merge([
+                'assigned_user_id' => $this->user()?->id,
+                'department' => $this->user()?->department ?? 'admission',
+            ]);
+        }
+    }
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -38,9 +50,9 @@ class StoreInquiryRequest extends FormRequest
                 'nullable',
                 Rule::exists('campuses', 'id')->where('is_active', true),
             ],
-            'status' => ['required', 'string', 'in:pending,not sure,not interested,not eligible,interested,call back,distance problem,not responding,for job,will visit,visited,p.o,online/short course,e-t paid,admission fee paid,master calsses'],
-            'assigned_user_id' => ['nullable', 'exists:users,id'],
-            'department' => ['required', 'string', 'in:admission,academics,accouts'],
+            'status' => ['required', 'string', Rule::in(InquiryOptions::STATUSES)],
+            'assigned_user_id' => ['required', 'exists:users,id'],
+            'department' => ['required', 'string', Rule::in(InquiryOptions::DEPARTMENTS)],
             'next_follow_up_at' => ['nullable', 'date'],
             'message' => ['nullable', 'string', 'max:5000'],
         ];

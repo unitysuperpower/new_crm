@@ -16,7 +16,10 @@ class StreamController extends Controller
             'response' => $request->validated('response'),
             'user_id' => $request->user()->id,
             'inquiry_id' => $inquiry->id,
+            'last_status' => $inquiry->status, // Assuming you want to store the last status of the inquiry in the stream
         ]);
+
+        $inquiry->update(['last_activity_at' => now()]);
 
         return back()->with('success', 'Discussion added.');
     }

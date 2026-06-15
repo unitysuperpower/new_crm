@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\Campus;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 
@@ -48,6 +49,21 @@ class HandleInertiaRequests extends Middleware
                     'permissions' => $user->permissionValues(),
                 ] : null,
             ],
+            'flash' => [
+                'success' => fn () => $request->session()->get('success'),
+                'error' => fn () => $request->session()->get('error'),
+            ],
+            'campusVisibility' => $user?->can('viewAny', Campus::class)
+                ? Campus::query()
+                    ->orderBy('name')
+                    ->get(['id', 'name', 'is_active'])
+                    ->map(fn (Campus $campus) => [
+                        'id' => $campus->id,
+                        'name' => $campus->name,
+                        'is_active' => $campus->is_active,
+                    ])
+                    ->values()
+                : [],
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
         ];
     }

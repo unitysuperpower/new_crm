@@ -16,6 +16,7 @@ class Stream extends Model
         'response',
         'user_id',
         'inquiry_id',
+        'last_status',
     ];
 
     public function user(): BelongsTo

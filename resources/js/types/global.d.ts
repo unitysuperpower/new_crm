@@ -12,6 +12,11 @@ declare module '@inertiajs/core' {
         sharedPageProps: {
             name: string;
             auth: Auth;
+            campusVisibility: Array<{
+                id: number;
+                name: string;
+                is_active: boolean;
+            }>;
             sidebarOpen: boolean;
             [key: string]: unknown;
         };

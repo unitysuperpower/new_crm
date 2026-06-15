@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\UserRole;
+use App\Http\Requests\SaveInquiryActivityRequest;
 use App\Http\Requests\StoreInquiryRequest;
-use App\Http\Requests\UpdateInquiryRequest;
 use App\Models\Campus;
 use App\Models\Inquiry;
 use App\Models\Program;
+use App\Models\Stream;
 use App\Models\User;
+use App\Support\InquiryOptions;
 use Dompdf\Dompdf;
 use Dompdf\Options;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,35 +26,14 @@ use Inertia\Response;
 
 class InquiryController extends Controller
 {
-    private const STATUSES = [
-        'pending',
-        'not sure',
-        'not interested',
-        'not eligible',
-        'interested',
-        'call back',
-        'distance problem',
-        'not responding',
-        'for job',
-        'will visit',
-        'visited',
-        'p.o',
-        'online/short course',
-        'e-t paid',
-        'admission fee paid',
-        'master calsses',
-    ];
-
-    private const DEPARTMENTS = ['admission', 'academics', 'accouts'];
-
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Inquiry::class);
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', Rule::in(self::STATUSES)],
-            'department' => ['nullable', Rule::in(self::DEPARTMENTS)],
+            'status' => ['nullable', Rule::in(InquiryOptions::STATUSES)],
+            'department' => ['nullable', Rule::in(InquiryOptions::DEPARTMENTS)],
             'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'source' => ['nullable', 'string', 'max:255'],
             'campus_id' => [
@@ -61,20 +43,14 @@ class InquiryController extends Controller
             ],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'queue' => ['nullable', Rule::in(['all', 'assigned_today', 'yesterday', 'today', 'next_3_days'])],
         ]);
 
         $isInquiryPage = $request->routeIs('inquiries.index');
+        $queue = $filters['queue'] ?? 'all';
 
-        $query = Inquiry::query()
+        $query = $this->workspaceQuery($request, $isInquiryPage, $queue)
             ->with(['program:id,name', 'campusModel:id,name', 'assignedUser:id,name', 'streams.user:id,name'])
-            ->where(function ($query) {
-                $query->whereNull('campus_id')
-                    ->orWhereHas('campusModel', fn ($campusQuery) => $campusQuery->where('is_active', true));
-            })
-            ->when(
-                $isInquiryPage,
-                fn ($query) => $query->where('assigned_user_id', $request->user()->id),
-            )
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('name', 'like', "%{$search}%")
@@ -96,10 +72,15 @@ class InquiryController extends Controller
             ->when($filters['source'] ?? null, fn ($query, string $source) => $query->where('source', $source))
             ->when($filters['campus_id'] ?? null, fn ($query, int $campusId) => $query->where('campus_id', $campusId))
             ->when($filters['date_from'] ?? null, fn ($query, string $dateFrom) => $query->whereDate('created_at', '>=', $dateFrom))
-            ->when($filters['date_to'] ?? null, fn ($query, string $dateTo) => $query->whereDate('created_at', '<=', $dateTo))
-            ->latest();
+            ->when($filters['date_to'] ?? null, fn ($query, string $dateTo) => $query->whereDate('created_at', '<=', $dateTo));
 
-        $paginatedInquiries = $query->paginate(15)->withQueryString();
+        match (true) {
+            $queue === 'assigned_today' => $query->latest('assigned_at'),
+            $isInquiryPage => $query->orderBy('next_follow_up_at')->latest('updated_at'),
+            default => $query->latest('created_at'),
+        };
+
+        $paginatedInquiries = $query->paginate(10)->withQueryString();
         $inquiries = $paginatedInquiries->getCollection()
             ->map(fn (Inquiry $inquiry) => $this->serializeInquiry($inquiry, $request->user()))
             ->values();
@@ -117,6 +98,7 @@ class InquiryController extends Controller
                 'campus_id' => $filters['campus_id'] ?? '',
                 'date_from' => $filters['date_from'] ?? '',
                 'date_to' => $filters['date_to'] ?? '',
+                'queue' => $queue,
             ],
             'inquiries' => $inquiries,
             'pagination' => [
@@ -133,7 +115,7 @@ class InquiryController extends Controller
             'campuses' => Campus::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'is_active']),
-            'teamMembers' => User::query()->orderBy('name')->get(['id', 'name']),
+            'teamMembers' => User::query()->orderBy('name')->get(['id', 'name', 'department']),
             'sourceOptions' => Inquiry::query()
                 ->where(function ($query) {
                     $query->whereNull('campus_id')
@@ -144,12 +126,21 @@ class InquiryController extends Controller
                 ->orderBy('source')
                 ->pluck('source')
                 ->values(),
-            'statusOptions' => self::STATUSES,
-            'departmentOptions' => self::DEPARTMENTS,
+            'statusOptions' => InquiryOptions::STATUSES,
+            'departmentOptions' => InquiryOptions::DEPARTMENTS,
+            'postalCommunicationOptions' => InquiryOptions::POSTAL_COMMUNICATIONS,
+            'inquiryCreationDefaults' => [
+                'assigned_user_id' => (string) $request->user()->id,
+                'department' => $request->user()->department ?? 'admission',
+            ],
+            'filterCounts' => $this->filterCounts($request, $isInquiryPage, $queue),
+            'queueCounts' => $this->queueCounts($request, $isInquiryPage),
             'crmPermissions' => [
                 'canCreateInquiry' => $request->user()->can('create', Inquiry::class),
                 'canImportInquiry' => $request->user()->can('import', Inquiry::class),
                 'canAssignInquiry' => $request->user()->can('assign', Inquiry::class),
+                'canSelectInquiryAssignee' => $request->user()->role === UserRole::SuperAdmin,
+                'canChangeInquiryDepartment' => $request->user()->role === UserRole::SuperAdmin,
                 'canManageCampus' => $request->user()->can('update', new Campus),
             ],
         ]);
@@ -159,7 +150,17 @@ class InquiryController extends Controller
     {
         Gate::authorize('create', Inquiry::class);
 
-        Inquiry::create($request->validated());
+        $data = $request->validated();
+        if ($request->user()->role !== UserRole::SuperAdmin) {
+            $data['assigned_user_id'] = $request->user()->id;
+            $data['department'] = $request->user()->department;
+        }
+
+        if (! empty($data['assigned_user_id'])) {
+            $data['assigned_at'] = now();
+        }
+
+        Inquiry::create($data);
 
         return back()->with('success', 'Inquiry created.');
     }
@@ -181,6 +182,10 @@ class InquiryController extends Controller
         $filters = $this->validateReportFilters($request);
         $inquiries = $this->reportQuery($request, $filters)->get();
         $payload = $this->reportPayload($inquiries, $filters);
+        $logoPath = public_path('logo.jpeg');
+        $payload['logoData'] = file_exists($logoPath)
+            ? 'data:image/jpeg;base64,'.base64_encode(file_get_contents($logoPath))
+            : null;
 
         $options = new Options;
         $options->set('defaultFont', 'DejaVu Sans');
@@ -194,6 +199,38 @@ class InquiryController extends Controller
 
         return response($pdf->output(), 200, [
             'Content-Disposition' => 'attachment; filename="'.$filename.'"',
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
+    public function invitationLetter(Request $request, Inquiry $inquiry): HttpResponse
+    {
+        Gate::authorize('view', $inquiry);
+        abort_unless($inquiry->postal_communication === 'send', 404);
+
+        $inquiry->loadMissing(['program:id,name', 'campusModel:id,name']);
+        $logoPath = public_path('logo.jpeg');
+        $logoData = file_exists($logoPath)
+            ? 'data:image/jpeg;base64,'.base64_encode(file_get_contents($logoPath))
+            : null;
+
+        $options = new Options;
+        $options->set('defaultFont', 'DejaVu Sans');
+
+        $pdf = new Dompdf($options);
+        $pdf->loadHtml(view('letters.inquiry-invitation', [
+            'inquiry' => $inquiry,
+            'logoData' => $logoData,
+            'programName' => $inquiry->program?->name ?? 'the selected academic program',
+            'campusName' => $inquiry->campusModel?->name ?? $inquiry->campus ?? 'Aurea Education',
+        ])->render());
+        $pdf->setPaper('a4', 'portrait');
+        $pdf->render();
+
+        $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '-', $inquiry->name) ?: 'student';
+
+        return response($pdf->output(), 200, [
+            'Content-Disposition' => 'attachment; filename="invitation-letter-'.$safeName.'.pdf"',
             'Content-Type' => 'application/pdf',
         ]);
     }
@@ -218,9 +255,9 @@ class InquiryController extends Controller
                 'nullable',
                 Rule::exists('campuses', 'id')->where('is_active', true),
             ],
-            'rows.*.status' => ['required', Rule::in(self::STATUSES)],
-            'rows.*.assigned_user_id' => ['nullable', 'exists:users,id'],
-            'rows.*.department' => ['required', Rule::in(self::DEPARTMENTS)],
+            'rows.*.status' => ['required', Rule::in(InquiryOptions::STATUSES)],
+            'rows.*.assigned_user_id' => ['prohibited'],
+            'rows.*.department' => ['required', Rule::in(InquiryOptions::DEPARTMENTS)],
             'rows.*.next_follow_up_at' => ['nullable', 'date'],
             'rows.*.message' => ['nullable', 'string', 'max:5000'],
         ]);
@@ -228,9 +265,10 @@ class InquiryController extends Controller
         DB::transaction(function () use ($validated) {
             foreach ($validated['rows'] as $row) {
                 if (empty($row['campus_id']) && ! empty($row['campus'])) {
-                    $row['campus_id'] = Campus::query()->firstOrCreate([
-                        'name' => $row['campus'],
-                    ])->id;
+                    $row['campus_id'] = Campus::query()
+                        ->where('is_active', true)
+                        ->whereRaw('LOWER(name) = ?', [mb_strtolower($row['campus'])])
+                        ->value('id');
                 }
 
                 Inquiry::create($row);
@@ -238,6 +276,34 @@ class InquiryController extends Controller
         });
 
         return back()->with('success', count($validated['rows']).' inquiries imported.');
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        Gate::authorize('viewAny', Inquiry::class);
+
+        $validated = $request->validate([
+            'query' => ['required', 'string', 'min:2', 'max:100'],
+            'mode' => ['nullable', Rule::in(['all', 'assigned'])],
+        ]);
+
+        $isAssigned = ($validated['mode'] ?? 'all') === 'assigned';
+        $search = $validated['query'];
+
+        $results = $this->visibleInquiryQuery($request, $isAssigned)
+            ->with(['program:id,name', 'campusModel:id,name', 'assignedUser:id,name', 'streams.user:id,name'])
+            ->where(function (Builder $query) use ($search): void {
+                $query->where('name', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            })
+            ->latest()
+            ->limit(8)
+            ->get()
+            ->map(fn (Inquiry $inquiry) => $this->serializeInquiry($inquiry, $request->user()))
+            ->values();
+
+        return response()->json(['results' => $results]);
     }
 
     // The assign method allows authorized users to bulk assign multiple inquiries to a specific team member, streamlining the workflow and ensuring that inquiries are promptly attended to by the appropriate staff.
@@ -251,19 +317,70 @@ class InquiryController extends Controller
             'assigned_user_id' => ['required', 'integer', 'exists:users,id'],
         ]);
 
+        $assignee = User::findOrFail($validated['assigned_user_id']);
+
         Inquiry::query()
             ->whereIn('id', $validated['inquiry_ids'])
-            ->update(['assigned_user_id' => $validated['assigned_user_id']]);
+            ->update([
+                'assigned_user_id' => $validated['assigned_user_id'],
+                'department' => $assignee->department,
+                'assigned_at' => now(),
+                'last_activity_at' => null,
+            ]);
 
         return back()->with('success', count($validated['inquiry_ids']).' inquiries assigned.');
     }
 
-    // The update method allows authorized users to modify the details of an existing inquiry, ensuring that the information remains accurate and up-to-date as the inquiry progresses through different stages of engagement.
-    public function update(UpdateInquiryRequest $request, Inquiry $inquiry): RedirectResponse
+    public function saveActivity(SaveInquiryActivityRequest $request, Inquiry $inquiry): RedirectResponse
     {
-        $inquiry->update($request->validated());
+        $validated = $request->validated();
+        $canUpdate = $request->user()->can('update', $inquiry);
+        $response = trim($validated['response'] ?? '');
 
-        return back()->with('success', 'Inquiry updated.');
+        DB::transaction(function () use ($canUpdate, $inquiry, $request, $response, $validated): void {
+            if ($canUpdate) {
+                $updates = [
+                    'name' => $validated['name'],
+                    'phone' => $validated['phone'],
+                    'email' => $validated['email'] ?? null,
+                    'city' => $validated['city'] ?? null,
+                    'address' => $validated['address'] ?? null,
+                    'source' => $validated['source'] ?? null,
+                    'program_id' => $validated['program_id'] ?? null,
+                    'previous_program' => $validated['previous_program'] ?? null,
+                    'campus_id' => $validated['campus_id'] ?? null,
+                    'message' => $validated['message'] ?? null,
+                    'status' => $validated['status'],
+                    'department' => $validated['department'],
+                    'postal_communication' => $validated['postal_communication'],
+                    'next_follow_up_at' => $validated['next_follow_up_at'] ?? null,
+                ];
+
+                $inquiry->update($updates);
+            }
+
+            if ($response !== '') {
+                Gate::authorize('createStream', $inquiry);
+
+                Stream::create([
+                    'response' => $response,
+                    'user_id' => $request->user()->id,
+                    'inquiry_id' => $inquiry->id,
+                    'last_status' => $inquiry->status,
+                ]);
+            }
+
+
+            if ($canUpdate || $response !== '') {
+                $inquiry->update(['last_activity_at' => now()]);
+            }
+        });
+
+        $message = $canUpdate
+            ? 'Inquiry and discussion updated.'
+            : 'Discussion added.';
+
+        return back()->with('success', $message);
     }
 
     // The serializeInquiry method transforms an Inquiry model instance into a structured array format suitable for frontend consumption, including related data and permission flags, ensuring that the frontend receives all necessary information in a consistent and optimized manner for rendering inquiry details and associated actions.
@@ -287,16 +404,116 @@ class InquiryController extends Controller
             'assigned_user_id' => $inquiry->assigned_user_id,
             'assigned_user' => $inquiry->assignedUser?->only(['id', 'name']),
             'department' => $inquiry->department,
+            'postal_communication' => $inquiry->postal_communication,
             'next_follow_up_at' => $inquiry->next_follow_up_at?->format('Y-m-d'),
+            'assigned_at' => $inquiry->assigned_at?->format('M d, Y h:i A'),
+            'last_activity_at' => $inquiry->last_activity_at?->format('M d, Y h:i A'),
             'message' => $inquiry->message,
             'can_update' => $user->can('update', $inquiry),
+            'can_stream' => $user->can('createStream', $inquiry),
             'created_at' => $inquiry->created_at?->format('M d, Y h:i A'),
             'streams' => $inquiry->streams->map(fn ($stream) => [
                 'id' => $stream->id,
                 'response' => $stream->response,
                 'user' => $stream->user?->only(['id', 'name']),
                 'created_at' => $stream->created_at?->format('M d, Y h:i A'),
+                'last_status' => $stream->last_status,
             ])->values(),
+        ];
+    }
+
+    private function visibleInquiryQuery(Request $request, bool $assignedOnly): Builder
+    {
+        return Inquiry::query()
+            ->where(function (Builder $query): void {
+                $query->whereNull('campus_id')
+                    ->orWhereHas('campusModel', fn (Builder $campusQuery) => $campusQuery->where('is_active', true));
+            })
+            ->when(
+                $assignedOnly,
+                fn (Builder $query) => $query->where('assigned_user_id', $request->user()->id),
+            );
+    }
+
+    private function workspaceQuery(Request $request, bool $isInquiryPage, string $queue): Builder
+    {
+        return $this->visibleInquiryQuery($request, $isInquiryPage)
+            ->when(
+                $queue === 'assigned_today',
+                fn (Builder $query) => $query
+                    ->whereNotNull('assigned_user_id')
+                    ->whereDate('assigned_at', today()),
+            )
+            ->when(
+                $isInquiryPage && $queue !== 'assigned_today',
+                fn (Builder $query) => $query->when(
+                    $queue !== 'all',
+                    function (Builder $followUpQuery) use ($queue): void {
+                        $followUpQuery->whereNotNull('next_follow_up_at');
+
+                        match ($queue) {
+                            'yesterday' => $followUpQuery->whereDate('next_follow_up_at', today()->subDay()),
+                            'today' => $followUpQuery->whereDate('next_follow_up_at', today()),
+                            'next_3_days' => $followUpQuery->whereBetween('next_follow_up_at', [
+                                today()->addDay()->startOfDay(),
+                                today()->addDays(3)->endOfDay(),
+                            ]),
+                            default => null,
+                        };
+                    },
+                ),
+            );
+    }
+
+    private function filterCounts(Request $request, bool $assignedOnly, string $queue): array
+    {
+        $base = $this->workspaceQuery($request, $assignedOnly, $queue);
+
+        $grouped = static function (Builder $query, string $column): array {
+            return $query
+                ->whereNotNull($column)
+                ->selectRaw("{$column} as filter_value, COUNT(*) as aggregate")
+                ->groupBy($column)
+                ->pluck('aggregate', 'filter_value')
+                ->map(fn ($count) => (int) $count)
+                ->all();
+        };
+
+        return [
+            'status' => $grouped(clone $base, 'status'),
+            'department' => $grouped(clone $base, 'department'),
+            'source' => $grouped(clone $base, 'source'),
+            'campus' => $grouped(clone $base, 'campus_id'),
+            'assigned_user' => $assignedOnly
+                ? []
+                : $grouped(clone $base, 'assigned_user_id'),
+        ];
+    }
+
+    private function queueCounts(Request $request, bool $isInquiryPage): array
+    {
+        $workspaceScope = $this->visibleInquiryQuery($request, $isInquiryPage);
+        $followUpScope = $this->visibleInquiryQuery($request, $isInquiryPage)
+            ->whereNotNull('next_follow_up_at');
+
+        return [
+            'total_inquiries' => (clone $workspaceScope)->count(),
+            'assigned_today' => (clone $workspaceScope)
+                ->whereNotNull('assigned_user_id')
+                ->whereDate('assigned_at', today())
+                ->count(),
+            'follow_ups_yesterday' => (clone $followUpScope)
+                ->whereDate('next_follow_up_at', today()->subDay())
+                ->count(),
+            'follow_ups_today' => (clone $followUpScope)
+                ->whereDate('next_follow_up_at', today())
+                ->count(),
+            'follow_ups_next_3_days' => (clone $followUpScope)
+                ->whereBetween('next_follow_up_at', [
+                    today()->addDay()->startOfDay(),
+                    today()->addDays(3)->endOfDay(),
+                ])
+                ->count(),
         ];
     }
 
@@ -304,7 +521,7 @@ class InquiryController extends Controller
     {
         return $request->validate([
             'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
-            'status' => ['nullable', Rule::in(self::STATUSES)],
+            'status' => ['nullable', Rule::in(InquiryOptions::STATUSES)],
             'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],

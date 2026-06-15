@@ -1,6 +1,11 @@
-name,phone,email,city,address,source,program,previous_program,campus,assigned_user,status,department,next_follow_up_at,message
-Ali Khan,03001234567,ali.khan@example.com,Lahore,"House 12, Model Town",Facebook,Web Development,Computer Basics,Main Campus,,pending,admission,2026-06-10,"Asked about class timing and admission fee."
-Sara Ahmed,03111234567,sara.ahmed@example.com,Karachi,"Block 5, Gulshan-e-Iqbal",Website,Graphic Design,,North Campus,,"interested",admission,2026-06-12,"Wants weekend classes and installment details."
-Usman Raza,03211234567,usman.raza@example.com,Islamabad,"Street 4, G-10",WhatsApp,Digital Marketing,MS Office,Online Campus,,"call back",admission,2026-06-09,"Requested call after 5 PM."
-Hina Malik,03331234567,hina.malik@example.com,Multan,"Near Cantt Market",Walk-in,English Language,,Main Campus,,"will visit",admission,2026-06-15,"Plans to visit campus with parents."
-Bilal Hussain,03451234567,bilal.hussain@example.com,Faisalabad,"People's Colony",Referral,Spoken English,,South Campus,,"not responding",admission,2026-06-11,"Called twice, no response yet."
+name,phone,email,city,address,source,program,previous_program,campus,status,department,next_follow_up_at,message
+Ali Khan,03001234567,ali.khan@example.com,Lahore,"House 12, Model Town",Facebook,,Computer Basics,Aurea,pending,admission,2026-06-12,"Asked about class timing and admission fee."
+Sara Ahmed,03111234567,sara.ahmed@example.com,Karachi,"Block 5, Gulshan-e-Iqbal",Website,,,ICLS,interested,admission,2026-06-13,"Wants weekend classes and installment details."
+Usman Raza,03211234567,usman.raza@example.com,Islamabad,"Street 4, G-10",WhatsApp,,MS Office,Aurea,call back,admission,2026-06-14,"Requested a call after 5 PM."
+Hina Malik,03331234567,hina.malik@example.com,Multan,"Near Cantt Market",Walk-in,,,ICLS,will visit,admission,2026-06-15,"Plans to visit the campus with her parents."
+Bilal Hussain,03451234567,bilal.hussain@example.com,Faisalabad,"People's Colony",Referral,,,Aurea,not responding,admission,2026-06-16,"Called twice but received no response."
+Ayesha Noor,03011223344,ayesha.noor@example.com,Lahore,"Johar Town Block H",Instagram,,Intermediate,ICLS,not sure,academics,2026-06-17,"Needs guidance about course eligibility and schedule."
+Hamza Tariq,03122334455,hamza.tariq@example.com,Rawalpindi,"Satellite Town",Facebook,,,Aurea,visited,admission,2026-06-18,"Visited the office and requested the fee structure."
+Maryam Iqbal,03233445566,maryam.iqbal@example.com,Sialkot,"Cantt Road",Website,,Matric,ICLS,distance problem,admission,2026-06-19,"Interested but concerned about travel distance."
+Zain Abbas,03344556677,zain.abbas@example.com,Gujranwala,"DC Colony",WhatsApp,,,Aurea,online/short course,academics,2026-06-20,"Asked for available online and short-course options."
+Fatima Zahra,03455667788,fatima.zahra@example.com,Bahawalpur,"Model Town A",Referral,,Bachelor,ICLS,admission fee paid,accounts,2026-06-21,"Admission fee received; confirmation call is required."

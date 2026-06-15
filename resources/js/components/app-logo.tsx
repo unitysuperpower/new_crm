@@ -3,13 +3,11 @@ import AppLogoIcon from '@/components/app-logo-icon';
 export default function AppLogo() {
     return (
         <>
-            {/* <div className="flex aspect-square size-8 items-center justify-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground">
-                <AppLogoIcon className="size-5 fill-current text-white dark:text-black" />
-            </div> */}
-            <AppLogoIcon className="w-10 h-10 rounded-full object-cover" />
-            <div className="ml-1 grid flex-1 text-left text-sm">
-                <span className="mb-0.5 truncate leading-tight font-semibold">
-                    Aurea Education
+            <AppLogoIcon className="size-9 rounded-md border bg-white object-cover shadow-sm" />
+            <div className="ml-1 grid flex-1 text-left text-sm leading-tight">
+                <span className="truncate font-semibold">Aurea Education</span>
+                <span className="truncate text-[11px] text-sidebar-foreground/55">
+                    Inquiry CRM
                 </span>
             </div>
         </>

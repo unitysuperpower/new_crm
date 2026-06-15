@@ -56,6 +56,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
     'emergency_contact_number',
     'password',
     'role',
+    'department',
     'permissions',
 ])]
 #[Hidden(['password', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]

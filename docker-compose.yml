@@ -5,7 +5,7 @@ services:
     image: nginx:stable-alpine
     container_name: new_web
     ports:
-      - "80:80"
+      - "0.0.0.0:80:80"
     volumes:
       - .:/var/www/html
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
@@ -56,7 +56,7 @@ services:
       PMA_PASSWORD: ""
       PMA_ALLOW_NO_PASSWORD: "yes"
     ports:
-      - "9090:80"
+      - "0.0.0.0:9090:80"
     networks:
       - new_network
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\UserPermission;
 use App\Enums\UserRole;
 use App\Models\User;
+use App\Support\InquiryOptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -28,9 +29,11 @@ class UserController extends Controller
                     'email' => $user->email,
                     'role' => $user->role?->value ?? UserRole::User->value,
                     'role_label' => ($user->role ?? UserRole::User)->label(),
+                    'department' => $user->department,
                     'permissions' => $user->permissionValues(),
                 ]),
             'roles' => UserRole::options(),
+            'departments' => InquiryOptions::DEPARTMENTS,
             'permissions' => collect(UserPermission::cases())
                 ->map(fn (UserPermission $permission) => [
                     'value' => $permission->value,
@@ -47,12 +50,14 @@ class UserController extends Controller
 
         $validated = $request->validate([
             'role' => ['required', Rule::enum(UserRole::class)],
+            'department' => ['required', Rule::in(InquiryOptions::DEPARTMENTS)],
             'permissions' => ['array'],
             'permissions.*' => ['string', Rule::enum(UserPermission::class)],
         ]);
 
         $user->update([
             'role' => UserRole::from($validated['role']),
+            'department' => $validated['department'],
             'permissions' => $validated['permissions'] ?? [],
         ]);
 

@@ -26,8 +26,11 @@ class Inquiry extends Model
         'campus_id',
         'status',
         'assigned_user_id',
+        'assigned_at',
         'department',
+        'postal_communication',
         'next_follow_up_at',
+        'last_activity_at',
         'message',
     ];
 
@@ -35,6 +38,8 @@ class Inquiry extends Model
     {
         return [
             'next_follow_up_at' => 'date:Y-m-d',
+            'assigned_at' => 'datetime',
+            'last_activity_at' => 'datetime',
         ];
     }
 

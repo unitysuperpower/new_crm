@@ -1,4 +1,5 @@
 import { Link, usePage } from '@inertiajs/react';
+import { Palette, ShieldCheck, UserRound, UsersRound } from 'lucide-react';
 import type { PropsWithChildren } from 'react';
 import Heading from '@/components/heading';
 import { Button } from '@/components/ui/button';
@@ -20,36 +21,36 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
         {
             title: 'Profile',
             href: edit(),
-            icon: null,
+            icon: UserRound,
         },
         {
             title: 'Security',
             href: editSecurity(),
-            icon: null,
+            icon: ShieldCheck,
         },
         canManageUsers && {
             title: 'Users',
             href: '/settings/users',
-            icon: null,
+            icon: UsersRound,
         },
         {
             title: 'Appearance',
             href: editAppearance(),
-            icon: null,
+            icon: Palette,
         },
     ].filter(Boolean) as NavItem[];
 
     return (
-        <div className="px-4 py-6">
+        <div className="crm-page">
             <Heading
                 title="Settings"
                 description="Manage your profile and account settings"
             />
 
-            <div className="flex flex-col lg:flex-row lg:space-x-12">
-                <aside className="w-full max-w-xl lg:w-48">
+            <div className="flex flex-col gap-6 lg:flex-row">
+                <aside className="w-full lg:w-56 lg:shrink-0">
                     <nav
-                        className="flex flex-col space-y-1 space-x-0"
+                        className="crm-panel flex flex-col gap-1 p-2"
                         aria-label="Settings"
                     >
                         {sidebarNavItems.map((item, index) => (
@@ -59,7 +60,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
                                 variant="ghost"
                                 asChild
                                 className={cn('w-full justify-start', {
-                                    'bg-muted': isCurrentOrParentUrl(item.href),
+                                    'bg-primary/10 text-primary':
+                                        isCurrentOrParentUrl(item.href),
                                 })}
                             >
                                 <Link href={item.href}>
@@ -75,8 +77,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
                 <Separator className="my-6 lg:hidden" />
 
-                <div className="flex-1 md:max-w-2xl">
-                    <section className="max-w-xl space-y-12">
+                <div className="min-w-0 flex-1">
+                    <section className="crm-panel max-w-3xl space-y-10 p-5 md:p-6">
                         {children}
                     </section>
                 </div>

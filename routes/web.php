@@ -21,8 +21,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ]);
     })->name('documentation.sample-inquiries');
     Route::get('inquiries', [InquiryController::class, 'index'])->name('inquiries.index');
+    Route::get('inquiries/search', [InquiryController::class, 'search'])->name('inquiries.search');
     Route::get('inquiries/report', [InquiryController::class, 'report'])->name('inquiries.report');
     Route::get('inquiries/report/pdf', [InquiryController::class, 'reportPdf'])->name('inquiries.report.pdf');
+    Route::get('inquiries/{inquiry}/invitation-letter.pdf', [InquiryController::class, 'invitationLetter'])->name('inquiries.invitation-letter');
     Route::get('programs', [ProgramController::class, 'index'])->name('programs.index');
     Route::post('programs', [ProgramController::class, 'store'])->name('programs.store');
     Route::patch('programs/{program}', [ProgramController::class, 'update'])->name('programs.update');
@@ -35,7 +37,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('inquiries', [InquiryController::class, 'store'])->name('inquiries.store');
     Route::post('inquiries/import', [InquiryController::class, 'import'])->name('inquiries.import');
     Route::patch('inquiries/assign', [InquiryController::class, 'assign'])->name('inquiries.assign');
-    Route::patch('inquiries/{inquiry}', [InquiryController::class, 'update'])->name('inquiries.update');
+    Route::patch('inquiries/{inquiry}/activity', [InquiryController::class, 'saveActivity'])->name('inquiries.activity.save');
     Route::post('inquiries/{inquiry}/streams', [StreamController::class, 'store'])->name('inquiries.streams.store');
 });
 
