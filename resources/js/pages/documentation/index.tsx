@@ -1,10 +1,13 @@
 import { Head, Link } from '@inertiajs/react';
 import {
+    AlertCircle,
     ArrowRight,
     BookOpen,
     Building2,
     CalendarClock,
+    Check,
     CheckCircle2,
+    ChevronRight,
     ClipboardList,
     Download,
     FileDown,
@@ -13,171 +16,149 @@ import {
     GraduationCap,
     History,
     LayoutDashboard,
-    ListFilter,
     LockKeyhole,
-    MessageSquareText,
     Search,
     ShieldCheck,
+    Sparkles,
+    Upload,
     UserCheck,
     UsersRound,
 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
-const sections = [
-    ['overview', 'Overview'],
-    ['daily-work', 'Daily work'],
-    ['screens', 'Screens'],
-    ['workflow', 'Workflow'],
-    ['access', 'Access'],
-    ['reports', 'Reports'],
-    ['csv', 'CSV import'],
-    ['rules', 'Rules'],
+const navigation = [
+    ['start', 'Start here', Sparkles],
+    ['roles', 'Roles and access', ShieldCheck],
+    ['inquiries', 'Inquiry guide', ClipboardList],
+    ['csv', 'CSV imports', FileSpreadsheet],
+    ['follow-up', 'Follow-ups and streams', CalendarClock],
+    ['reports', 'Reports and letters', FileDown],
+    ['management', 'System management', Building2],
+    ['help', 'Troubleshooting', AlertCircle],
 ] as const;
 
-const modules = [
+const quickSteps = [
     {
-        title: 'Dashboard',
-        icon: LayoutDashboard,
-        description:
-            'Shows all inquiries visible through active campuses, with search, filters, assignment, and pagination.',
-        features: [
-            'All inquiries',
-            'Campus controls',
-            'Bulk assignment',
-            'Pagination',
-        ],
-    },
-    {
-        title: 'Assigned inquiries',
-        icon: ClipboardList,
-        description:
-            'Shows every inquiry assigned to the signed-in employee, including records without a follow-up date.',
-        features: ['My assignments', 'Date queues', 'Streams', 'Reports'],
-    },
-    {
-        title: 'Programs',
-        icon: GraduationCap,
-        description:
-            'Maintains program name, duration, and fee options used by inquiry records.',
-        features: ['Create', 'Edit', 'Search', 'Usage count'],
-    },
-    {
-        title: 'Campuses',
+        title: 'Prepare the workspace',
+        text: 'Create active campuses, programs, employees, roles, and permissions before daily inquiry work begins.',
         icon: Building2,
-        description:
-            'Maintains campus details and controls whether related inquiries remain visible.',
-        features: ['Create', 'Edit', 'Visibility', 'Usage count'],
     },
     {
-        title: 'Users and settings',
-        icon: UsersRound,
-        description:
-            'Manages existing employee roles, permissions, profile information, security, and appearance.',
-        features: ['Roles', 'Permissions', 'Profile', 'Security'],
+        title: 'Capture inquiries',
+        text: 'Create a single inquiry from the modal or upload a CSV and review every row before submission.',
+        icon: Upload,
+    },
+    {
+        title: 'Assign and follow up',
+        text: 'Super Admin assigns ownership. The assigned employee updates details, status, follow-up date, and discussion.',
+        icon: UserCheck,
+    },
+    {
+        title: 'Review and report',
+        text: 'Use queues, filters, history, PDF reports, and invitation letters to keep work visible and accountable.',
+        icon: FileDown,
     },
 ];
 
-const workflow = [
+const inquirySteps = [
     [
-        'Prepare reference data',
-        'Create the programs and campuses employees will select in inquiry forms and CSV imports.',
+        'Open the inquiry',
+        'Use the View action beside the inquiry checkbox. The complete inquiry opens in a modal.',
     ],
     [
-        'Capture inquiries',
-        'Add an inquiry through the modal form or upload a CSV and review every row before submission. CSV rows are created unassigned.',
+        'Review current details',
+        'Status, department, program, campus, assignment, contact details, message, and follow-up date are shown together.',
     ],
     [
-        'Assign ownership',
-        'A Super Admin selects one or more inquiries and assigns or reassigns them to an employee.',
+        'Edit when permitted',
+        'Select the pencil icon. Super Admin, Admin with management permission, or the assigned employee can edit.',
     ],
     [
-        'Work the inquiry',
-        'The assigned employee updates status, department, and next follow-up date from the detail modal.',
+        'Add the discussion',
+        'A stream response is required when submitting an inquiry update so the latest conversation is recorded.',
     ],
     [
-        'Record discussion',
-        'Submit a required stream response with each assigned-inquiry update so the complete discussion history remains available.',
+        'Submit once',
+        'Use the single bottom action to save the inquiry and stream. View-only employees can submit a stream when permitted.',
     ],
-    [
-        'Review and report',
-        'Use filters and pagination for daily work, or generate an updated-date report with PDF download.',
-    ],
-];
-
-const roleRows = [
-    {
-        role: 'Super Admin',
-        access: 'All system permissions, user management, inquiry assignment and reassignment, reports, campuses, and programs.',
-    },
-    {
-        role: 'Admin',
-        access: 'Views and manages inquiries, imports CSV files, creates streams, and manages programs and campuses. Assignment remains Super Admin only.',
-    },
-    {
-        role: 'User',
-        access: 'Views and creates inquiries, updates inquiries assigned to them, and adds discussion streams.',
-    },
 ];
 
 const csvColumns = [
-    ['name', 'Required', 'Student or inquiry name'],
-    ['phone', 'Required', 'Primary contact number'],
-    ['email', 'Optional', 'Valid email address'],
+    ['name', 'Required', 'Student name'],
+    ['phone', 'Required', 'Primary phone and duplicate key'],
+    ['email', 'Optional', 'Valid email and duplicate key'],
     ['city', 'Optional', 'Current city'],
-    ['address', 'Optional', 'Full address'],
-    [
-        'source',
-        'Optional',
-        'Lead source such as Website, Facebook, or WhatsApp',
-    ],
-    ['program', 'Optional', 'Program name matched with the program list'],
-    ['previous_program', 'Optional', 'Previous education or program'],
-    ['campus', 'Optional', 'Campus name; active campuses can be selected'],
-    ['status', 'Required', 'Must match one of the supported inquiry statuses'],
+    ['address', 'Optional', 'Full postal address'],
+    ['source', 'Optional', 'Website, Facebook, WhatsApp, referral, etc.'],
+    ['program', 'Optional', 'Must match an existing program name'],
+    ['previous_program', 'Optional', 'Previous education or qualification'],
+    ['campus', 'Optional', 'Matched against active campuses'],
+    ['status', 'Required', 'A supported inquiry status'],
     ['department', 'Required', 'admission, academics, or accounts'],
     ['next_follow_up_at', 'Optional', 'Date in YYYY-MM-DD format'],
-    ['message', 'Optional', 'Initial inquiry discussion or request'],
+    ['message', 'Optional', 'Initial inquiry note'],
 ];
 
-const statuses = [
-    'pending',
-    'not sure',
-    'not interested',
-    'not eligible',
-    'interested',
-    'call back',
-    'distance problem',
-    'not responding',
-    'for job',
-    'will visit',
-    'visited',
-    'p.o',
-    'online/short course',
-    'e-t paid',
-    'admission fee paid',
-    'master classes',
+const helpTopics = [
+    {
+        title: 'The pencil button is not visible',
+        text: 'The signed-in employee does not have update permission for that inquiry. Confirm assignment and the Update Assigned Inquiry or Manage Inquiry permission.',
+    },
+    {
+        title: 'An inquiry is missing from the Inquiries page',
+        text: 'The Inquiries page only shows records assigned to the signed-in employee. Use Dashboard for all permitted inquiries and confirm the campus is active.',
+    },
+    {
+        title: 'A CSV row was not imported',
+        text: 'The system skips duplicate phone numbers or email addresses, including duplicates already stored and duplicates repeated inside the same file.',
+    },
+    {
+        title: 'Invitation letter PDF is unavailable',
+        text: 'Postal Communication must be set to Sent. Pending inquiries cannot generate the student invitation letter.',
+    },
+    {
+        title: 'A program or campus cannot be deleted',
+        text: 'Referenced records are protected. Keep the record or disable the campus so historical inquiry data remains intact.',
+    },
+    {
+        title: 'Filters show unexpected dates',
+        text: 'Table date filters use created_at, follow-up queues use next_follow_up_at, and report date filters use updated_at in the Asia/Karachi timezone.',
+    },
 ];
 
 export default function DocumentationIndex() {
+    const [search, setSearch] = useState('');
+    const matchingTopics = useMemo(() => {
+        const query = search.trim().toLowerCase();
+
+        if (query.length < 2) {
+            return [];
+        }
+
+        return helpTopics.filter(({ title, text }) =>
+            `${title} ${text}`.toLowerCase().includes(query),
+        );
+    }, [search]);
+
     return (
         <>
-            <Head title="Project Documentation" />
+            <Head title="User Guide" />
             <div className="crm-page">
                 <header className="crm-page-header">
                     <div>
-                        <div className="mb-2 inline-flex items-center gap-2 text-xs font-semibold tracking-normal text-primary uppercase">
+                        <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-primary uppercase">
                             <BookOpen className="size-4" />
-                            System handbook
+                            Aurea CRM handbook
                         </div>
-                        <h1 className="crm-page-title">
-                            Aurea Education CRM documentation
-                        </h1>
+                        <h1 className="crm-page-title">User Guide</h1>
                         <p className="crm-page-description">
-                            Current guide to inquiry operations, employee
-                            access, campus visibility, reporting, CSV imports,
-                            and the limitations enforced by the system.
+                            Practical instructions for managing student
+                            inquiries, assignments, follow-ups, CSV imports,
+                            reports, employees, campuses, and programs.
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -196,506 +177,443 @@ export default function DocumentationIndex() {
                     </div>
                 </header>
 
-                <nav
-                    className="crm-panel sticky top-16 z-20 flex gap-1 overflow-x-auto bg-card/95 p-2 backdrop-blur"
-                    aria-label="Documentation sections"
-                >
-                    {sections.map(([id, label]) => (
-                        <a
-                            key={id}
-                            href={`#${id}`}
-                            className="rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                        >
-                            {label}
-                        </a>
-                    ))}
-                </nav>
-
-                <section id="overview" className="scroll-mt-32 space-y-4">
-                    <SectionHeading
-                        icon={ShieldCheck}
-                        title="System overview"
-                        description="A permission-aware CRM for managing education inquiries from capture through follow-up and reporting."
-                    />
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <Metric
-                            label="Primary modules"
-                            value="5"
-                            note="Inquiry, stream, program, campus, user"
-                        />
-                        <Metric
-                            label="Defined roles"
-                            value="3"
-                            note="Super Admin, Admin, User"
-                        />
-                        <Metric
-                            label="Follow-up queues"
-                            value="5"
-                            note="All, assigned today, yesterday, today, next 3 days"
-                        />
-                        <Metric
-                            label="Report format"
-                            value="PDF"
-                            note="Preview before download"
-                        />
-                    </div>
-                    <div className="crm-panel grid gap-0 lg:grid-cols-3">
-                        <PurposeBlock
-                            icon={UserCheck}
-                            title="Clear ownership"
-                            text="Every assigned inquiry has a responsible employee. Super Admin can reassign ownership when work changes."
-                        />
-                        <PurposeBlock
-                            icon={History}
-                            title="Continuous history"
-                            text="Stream notes remain attached to the inquiry and can be reviewed by all or filtered by contributing employee."
-                        />
-                        <PurposeBlock
-                            icon={LockKeyhole}
-                            title="Controlled access"
-                            text="Navigation and actions are permission-aware. Public registration is disabled; employee access is managed internally."
-                        />
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-3">
-                        <QuickLink
-                            href="/dashboard"
-                            icon={LayoutDashboard}
-                            title="Open the full register"
-                            text="Search, filter, select, assign, and review every visible inquiry."
-                        />
-                        <QuickLink
-                            href="/inquiries"
-                            icon={ClipboardList}
-                            title="Open my assignments"
-                            text="Work assigned inquiries and organize follow-ups by date."
-                        />
-                        <QuickLink
-                            href="/documentation/sample-inquiries-upload.csv"
-                            icon={FileSpreadsheet}
-                            title="Download CSV template"
-                            text="Start with the supported columns and ten example records."
-                            download
-                        />
-                    </div>
-                </section>
-
-                <section id="daily-work" className="scroll-mt-32 space-y-4">
-                    <SectionHeading
-                        icon={ListFilter}
-                        title="Daily inquiry workspace"
-                        description="Use the Dashboard for oversight and assignment; use Inquiries for personal follow-up work."
-                    />
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        <WorkspaceGuide
-                            icon={LayoutDashboard}
-                            title="Dashboard"
-                            audience="Super Admin and permitted managers"
-                            points={[
-                                'Shows all inquiries across active campuses.',
-                                'Includes both assigned and unassigned records.',
-                                'Supports search, filters, pagination, and bulk assignment.',
-                                'Assigned today counts records whose assignment date is today.',
-                            ]}
-                        />
-                        <WorkspaceGuide
-                            icon={UserCheck}
-                            title="Inquiries"
-                            audience="Signed-in employee"
-                            points={[
-                                'Shows only inquiries assigned to the current employee.',
-                                'Keeps assigned records visible even when no follow-up date is set.',
-                                'Allows inquiry updates only with a stream response.',
-                                'Provides report preview and PDF download within the permitted scope.',
-                            ]}
-                        />
-                    </div>
-                    <div className="crm-panel overflow-x-auto">
-                        <table className="w-full min-w-[720px] text-sm">
-                            <thead className="bg-muted text-muted-foreground">
-                                <tr>
-                                    <Th>Queue</Th>
-                                    <Th>Date rule</Th>
-                                    <Th>Use</Th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <QueueRow
-                                    name="All assigned"
-                                    rule="Any date, including no follow-up date"
-                                    use="Complete personal workload"
-                                />
-                                <QueueRow
-                                    name="Assigned today"
-                                    rule="Assignment date is today"
-                                    use="Review newly assigned ownership"
-                                />
-                                <QueueRow
-                                    name="Yesterday"
-                                    rule="Follow-up date was yesterday"
-                                    use="Recover missed follow-ups"
-                                />
-                                <QueueRow
-                                    name="Today"
-                                    rule="Follow-up date is today"
-                                    use="Current priority calls"
-                                />
-                                <QueueRow
-                                    name="Next 3 days"
-                                    rule="Tomorrow through three days ahead"
-                                    use="Prepare upcoming work"
-                                />
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                <section id="screens" className="scroll-mt-32 space-y-4">
-                    <SectionHeading
-                        icon={LayoutDashboard}
-                        title="Screens and modules"
-                        description="What each main area is responsible for and how employees should use it."
-                    />
-                    <div className="grid gap-px overflow-hidden rounded-lg border bg-border md:grid-cols-2 xl:grid-cols-5">
-                        {modules.map((module) => (
-                            <ModuleCard key={module.title} {...module} />
-                        ))}
-                    </div>
-                    <Callout title="Dashboard and inquiry page are intentionally different">
-                        The Dashboard shows the complete inquiry register across
-                        active campuses, including records waiting for
-                        assignment. The Inquiries screen only shows records
-                        assigned to the logged-in employee, with Yesterday,
-                        Today, and Next 3 days follow-up views. Both tables
-                        paginate at the bottom.
-                    </Callout>
-                </section>
-
-                <section id="workflow" className="scroll-mt-32 space-y-4">
-                    <SectionHeading
-                        icon={ClipboardList}
-                        title="Inquiry workflow"
-                        description="Recommended order for capturing, assigning, following, and reporting inquiries."
-                    />
-                    <div className="crm-panel divide-y">
-                        {workflow.map(([title, text], index) => (
-                            <div
-                                key={title}
-                                className="grid gap-3 p-4 sm:grid-cols-[2.5rem_12rem_1fr] sm:items-start sm:p-5"
-                            >
-                                <span className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-sm font-semibold text-primary">
-                                    {index + 1}
-                                </span>
-                                <h3 className="text-sm font-semibold">
-                                    {title}
-                                </h3>
-                                <p className="text-sm leading-6 text-muted-foreground">
-                                    {text}
-                                </p>
-                            </div>
-                        ))}
-                    </div>
-                </section>
-
-                <section id="access" className="scroll-mt-32 space-y-4">
-                    <SectionHeading
-                        icon={UsersRound}
-                        title="Roles and permissions"
-                        description="Default role capabilities can be refined through the employee permission controls."
-                    />
-                    <div className="crm-panel overflow-x-auto">
-                        <table className="w-full min-w-[760px] text-sm">
-                            <thead className="bg-muted text-muted-foreground">
-                                <tr>
-                                    <Th>Role</Th>
-                                    <Th>Default operating access</Th>
-                                    <Th>Important limitation</Th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {roleRows.map((row) => (
-                                    <tr
-                                        key={row.role}
-                                        className="crm-table-row"
+                <div className="grid min-w-0 gap-6 xl:grid-cols-[15rem_minmax(0,1fr)]">
+                    <aside className="hidden xl:block">
+                        <div className="sticky top-20 space-y-4">
+                            <nav className="border-l" aria-label="User guide">
+                                {navigation.map(([id, label, Icon]) => (
+                                    <a
+                                        key={id}
+                                        href={`#${id}`}
+                                        className="flex items-center gap-2.5 border-l-2 border-transparent px-4 py-2.5 text-sm text-muted-foreground transition hover:border-primary hover:bg-muted/40 hover:text-foreground"
                                     >
-                                        <Td>
-                                            <Badge variant="secondary">
-                                                {row.role}
-                                            </Badge>
-                                        </Td>
-                                        <Td>{row.access}</Td>
-                                        <Td>
-                                            {row.role === 'Super Admin'
-                                                ? 'Full access'
-                                                : row.role === 'Admin'
-                                                  ? 'Cannot assign or reassign inquiries'
-                                                  : 'Can update only assigned inquiries'}
-                                        </Td>
-                                    </tr>
+                                        <Icon className="size-4" />
+                                        {label}
+                                    </a>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        <Rule
-                            icon={ShieldCheck}
-                            title="Assignment"
-                            text="Only Super Admin can bulk assign or reassign inquiries."
-                        />
-                        <Rule
-                            icon={UserCheck}
-                            title="Updates"
-                            text="The assigned employee can update the complete inquiry record, including department. Admin can update any inquiry; reassignment remains Super Admin only."
-                        />
-                        <Rule
-                            icon={MessageSquareText}
-                            title="Streams"
-                            text="Employees with Add Inquiry Streams permission can submit discussion notes. A response is required when the assigned user updates an inquiry."
-                        />
-                        <Rule
-                            icon={LockKeyhole}
-                            title="Registration"
-                            text="Public registration is disabled. Existing employee access is administered internally."
-                        />
-                        <Rule
-                            icon={GraduationCap}
-                            title="Programs"
-                            text="Program controls only appear for employees with Manage Programs permission."
-                        />
-                        <Rule
-                            icon={Building2}
-                            title="Campuses"
-                            text="Campus controls only appear for employees with Manage Campuses permission."
-                        />
-                    </div>
-                </section>
-
-                <section id="reports" className="scroll-mt-32 space-y-4">
-                    <SectionHeading
-                        icon={FileDown}
-                        title="Assigned inquiry reports"
-                        description="Generate a filtered preview from the Assigned Inquiries section before downloading PDF."
-                    />
-                    <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
-                        <div className="crm-panel p-5">
-                            <h3 className="text-sm font-semibold">
-                                Available filters
-                            </h3>
-                            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                <Feature
-                                    icon={Building2}
-                                    title="Campus"
-                                    text="Include one active campus or all permitted campuses."
-                                />
-                                <Feature
-                                    icon={Filter}
-                                    title="Status"
-                                    text="Include one inquiry status or all statuses."
-                                />
-                                <Feature
-                                    icon={UsersRound}
-                                    title="Assigned user"
-                                    text="Available to Super Admin; regular users remain limited to themselves."
-                                />
-                                <Feature
-                                    icon={CalendarClock}
-                                    title="Date range"
-                                    text="From and to dates both filter the inquiry updated_at value."
-                                />
-                            </div>
-                        </div>
-                        <div className="crm-panel p-5">
-                            <h3 className="text-sm font-semibold">
-                                Report behavior
-                            </h3>
-                            <ul className="mt-4 space-y-3">
-                                <Check text="Today Report sets both dates to the current local date." />
-                                <Check text="Preview shows total records and only status counts greater than zero." />
-                                <Check text="The inquiry list includes contact, program, campus, user, status, department, and last update." />
-                                <Check text="PDF download uses the same permission scope and filters as the preview." />
-                            </ul>
-                        </div>
-                    </div>
-                    <Callout title="Date behavior">
-                        Dashboard table date filters use inquiry creation dates
-                        (`created_at`). Follow-up queues use
-                        `next_follow_up_at`. Report date filters use last
-                        modification dates (`updated_at`) so the report
-                        represents work performed during the period.
-                    </Callout>
-                </section>
-
-                <section id="csv" className="scroll-mt-32 space-y-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                        <SectionHeading
-                            icon={FileSpreadsheet}
-                            title="CSV inquiry import"
-                            description="Upload up to 500 rows, review the parsed table in a modal, then submit the import."
-                        />
-                        <Button asChild variant="outline">
-                            <a href="/documentation/sample-inquiries-upload.csv">
-                                <Download />
-                                Download template
-                            </a>
-                        </Button>
-                    </div>
-                    <div className="crm-panel overflow-x-auto">
-                        <table className="w-full min-w-[780px] text-sm">
-                            <thead className="bg-muted text-muted-foreground">
-                                <tr>
-                                    <Th>Column</Th>
-                                    <Th>Requirement</Th>
-                                    <Th>Purpose</Th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {csvColumns.map(
-                                    ([column, requirement, purpose]) => (
-                                        <tr
-                                            key={column}
-                                            className="crm-table-row"
-                                        >
-                                            <Td>
-                                                <code className="rounded bg-muted px-1.5 py-1 text-xs">
-                                                    {column}
-                                                </code>
-                                            </Td>
-                                            <Td>
-                                                <Badge
-                                                    variant={
-                                                        requirement ===
-                                                        'Required'
-                                                            ? 'secondary'
-                                                            : 'outline'
-                                                    }
-                                                >
-                                                    {requirement}
-                                                </Badge>
-                                            </Td>
-                                            <Td>{purpose}</Td>
-                                        </tr>
-                                    ),
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-3">
-                        <Rule
-                            icon={Search}
-                            title="Review first"
-                            text="Rows are parsed into a review table. Check names, mappings, statuses, and dates before submit."
-                        />
-                        <Rule
-                            icon={Building2}
-                            title="Campus matching"
-                            text="Campus values are matched by name. Inquiry selection is limited to active campuses."
-                        />
-                        <Rule
-                            icon={GraduationCap}
-                            title="Program matching"
-                            text="Program names should match existing program records for reliable mapping."
-                        />
-                    </div>
-                    <Callout title="Assignment is intentionally separate">
-                        CSV imports never assign an employee. Every imported
-                        inquiry enters the Dashboard as unassigned, then Super
-                        Admin assigns or reassigns ownership from the table.
-                    </Callout>
-                    <Callout title="Manual inquiry ownership">
-                        A regular employee is automatically selected as the
-                        assignee when creating an inquiry, and their employee
-                        department is locked onto the record. Super Admin can
-                        choose another employee; that employee's department is
-                        selected automatically and remains editable by Super
-                        Admin.
-                    </Callout>
-                </section>
-
-                <section id="rules" className="scroll-mt-32 space-y-4">
-                    <SectionHeading
-                        icon={LockKeyhole}
-                        title="System rules and limitations"
-                        description="Behaviors intentionally enforced to protect data integrity and access boundaries."
-                    />
-                    <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
-                        <div className="crm-panel divide-y">
-                            <RuleRow title="Campus visibility">
-                                Disabling a campus hides its inquiries from
-                                dashboard lists and reports without deleting the
-                                records.
-                            </RuleRow>
-                            <RuleRow title="Program deletion">
-                                A program linked to any inquiry cannot be
-                                deleted.
-                            </RuleRow>
-                            <RuleRow title="Campus deletion">
-                                A campus linked to any inquiry cannot be
-                                deleted; disable it instead.
-                            </RuleRow>
-                            <RuleRow title="Inquiry deletion">
-                                Inquiry deletion, restore, and permanent
-                                deletion are currently disabled.
-                            </RuleRow>
-                            <RuleRow title="Assigned user scope">
-                                The Inquiries page always limits records to the
-                                logged-in employee. Assignment is performed by
-                                Super Admin, never by CSV import.
-                            </RuleRow>
-                            <RuleRow title="Postal invitation letter">
-                                When Postal Communication is marked Sent, the
-                                inquiry table and detail modal show a PDF icon
-                                for downloading the formal university-style
-                                invitation letter. Pending records cannot
-                                generate the letter.
-                            </RuleRow>
-                            <RuleRow title="Authentication">
-                                Users must be authenticated and email verified.
-                                Public registration is unavailable.
-                            </RuleRow>
-                        </div>
-                        <div className="crm-panel p-5">
-                            <h3 className="text-sm font-semibold">
-                                Supported inquiry statuses
-                            </h3>
-                            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                                Manual entry, CSV imports, filters, updates, and
-                                reports use this shared status catalog.
-                            </p>
-                            <div className="mt-4 flex flex-wrap gap-2">
-                                {statuses.map((status) => (
-                                    <Badge
-                                        key={status}
-                                        variant="outline"
-                                        className="capitalize"
-                                    >
-                                        {status}
+                            </nav>
+                            <div className="rounded-md border bg-muted/20 p-4">
+                                <div className="text-xs font-semibold uppercase">
+                                    Current system
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                    <Badge variant="secondary">3 roles</Badge>
+                                    <Badge variant="secondary">
+                                        PDF export
                                     </Badge>
-                                ))}
+                                    <Badge variant="secondary">
+                                        CSV archive
+                                    </Badge>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </section>
+                    </aside>
+
+                    <main className="min-w-0 space-y-12">
+                        <section id="start" className="scroll-mt-24 space-y-5">
+                            <SectionTitle
+                                icon={Sparkles}
+                                eyebrow="Quick start"
+                                title="Start with the daily workflow"
+                                description="The CRM is designed around clear ownership: capture the inquiry, assign it, record every discussion, and schedule the next action."
+                            />
+                            <div className="grid border md:grid-cols-2 xl:grid-cols-4">
+                                {quickSteps.map((step, index) => (
+                                    <div
+                                        key={step.title}
+                                        className="border-b p-5 last:border-b-0 md:border-r xl:border-b-0 xl:last:border-r-0 md:[&:nth-child(2)]:border-r-0 xl:[&:nth-child(2)]:border-r"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+                                                <step.icon className="size-4" />
+                                            </span>
+                                            <span className="text-xs font-semibold text-muted-foreground">
+                                                0{index + 1}
+                                            </span>
+                                        </div>
+                                        <h3 className="mt-4 text-sm font-semibold">
+                                            {step.title}
+                                        </h3>
+                                        <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                                            {step.text}
+                                        </p>
+                                    </div>
+                                ))}
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-3">
+                                <QuickAction
+                                    href="/dashboard"
+                                    icon={LayoutDashboard}
+                                    title="Dashboard"
+                                    text="All permitted inquiries and assignment work"
+                                />
+                                <QuickAction
+                                    href="/inquiries"
+                                    icon={ClipboardList}
+                                    title="Assigned inquiries"
+                                    text="Your assigned records and follow-up queues"
+                                />
+                                <QuickAction
+                                    href="/documentation/sample-inquiries-upload.csv"
+                                    icon={FileSpreadsheet}
+                                    title="CSV template"
+                                    text="Download the current import structure"
+                                />
+                            </div>
+                        </section>
+
+                        <section id="roles" className="scroll-mt-24 space-y-5">
+                            <SectionTitle
+                                icon={ShieldCheck}
+                                eyebrow="Access control"
+                                title="Roles and responsibilities"
+                                description="Menus and actions only appear when the employee has the required permission. Super Admin controls employee permissions."
+                            />
+                            <div className="overflow-x-auto border">
+                                <table className="w-full min-w-[760px] text-sm">
+                                    <thead className="bg-muted/60 text-muted-foreground">
+                                        <tr>
+                                            <Th>Role</Th>
+                                            <Th>Primary responsibility</Th>
+                                            <Th>Important limits</Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <RoleRow
+                                            role="Super Admin"
+                                            responsibility="Manages employees, permissions, programs, campuses, all inquiries, assignment, reassignment, imports, and reports."
+                                            limit="Only role that can assign or reassign inquiry ownership."
+                                        />
+                                        <RoleRow
+                                            role="Admin"
+                                            responsibility="Manages inquiry operations and reference data according to granted permissions."
+                                            limit="Cannot assign inquiries unless the role policy is changed."
+                                        />
+                                        <RoleRow
+                                            role="User"
+                                            responsibility="Creates inquiries, works assigned inquiries, schedules follow-ups, and records discussions."
+                                            limit="Only edits assigned inquiries and only sees permitted menu items."
+                                        />
+                                    </tbody>
+                                </table>
+                            </div>
+                        </section>
+
+                        <section
+                            id="inquiries"
+                            className="scroll-mt-24 space-y-5"
+                        >
+                            <SectionTitle
+                                icon={ClipboardList}
+                                eyebrow="Core workflow"
+                                title="Create, view, and update inquiries"
+                                description="Inquiry forms open in modals so employees keep their table context while creating, reviewing, and updating records."
+                            />
+                            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                                <div className="divide-y border">
+                                    {inquirySteps.map(
+                                        ([title, text], index) => (
+                                            <GuideStep
+                                                key={title}
+                                                number={index + 1}
+                                                title={title}
+                                                text={text}
+                                            />
+                                        ),
+                                    )}
+                                </div>
+                                <div className="space-y-3">
+                                    <InfoPanel
+                                        icon={LayoutDashboard}
+                                        title="Dashboard scope"
+                                        text="Shows all inquiries allowed by permissions and active-campus visibility. Super Admin assigns from this table."
+                                    />
+                                    <InfoPanel
+                                        icon={UserCheck}
+                                        title="Inquiries scope"
+                                        text="Shows only inquiries assigned to the signed-in employee, including assigned-today and follow-up queues."
+                                    />
+                                    <InfoPanel
+                                        icon={LockKeyhole}
+                                        title="Editing control"
+                                        text="The pencil icon appears only when the employee can update that inquiry."
+                                    />
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="csv" className="scroll-mt-24 space-y-5">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                                <SectionTitle
+                                    icon={FileSpreadsheet}
+                                    eyebrow="Bulk capture"
+                                    title="CSV import guide"
+                                    description="Upload a CSV, review the parsed rows, and submit up to 500 inquiries in one operation."
+                                />
+                                <Button asChild variant="outline">
+                                    <a href="/documentation/sample-inquiries-upload.csv">
+                                        <Download />
+                                        Download template
+                                    </a>
+                                </Button>
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-3">
+                                <InfoPanel
+                                    icon={Search}
+                                    title="Review before submit"
+                                    text="The CSV opens in a preview modal. Confirm mappings, dates, campus, program, and status values."
+                                />
+                                <InfoPanel
+                                    icon={CheckCircle2}
+                                    title="Duplicate protection"
+                                    text="Matching phone numbers or emails are skipped, including repeats inside the same uploaded file."
+                                />
+                                <InfoPanel
+                                    icon={History}
+                                    title="Private archive"
+                                    text="The original CSV is stored privately with its original name plus the upload date and time."
+                                />
+                            </div>
+                            <div className="overflow-x-auto border">
+                                <table className="w-full min-w-[780px] text-sm">
+                                    <thead className="bg-muted/60 text-muted-foreground">
+                                        <tr>
+                                            <Th>CSV column</Th>
+                                            <Th>Requirement</Th>
+                                            <Th>Use</Th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {csvColumns.map(
+                                            ([name, requirement, use]) => (
+                                                <tr
+                                                    key={name}
+                                                    className="crm-table-row"
+                                                >
+                                                    <Td>
+                                                        <code className="rounded bg-muted px-1.5 py-1 text-xs">
+                                                            {name}
+                                                        </code>
+                                                    </Td>
+                                                    <Td>
+                                                        <Badge
+                                                            variant={
+                                                                requirement ===
+                                                                'Required'
+                                                                    ? 'secondary'
+                                                                    : 'outline'
+                                                            }
+                                                        >
+                                                            {requirement}
+                                                        </Badge>
+                                                    </Td>
+                                                    <Td>{use}</Td>
+                                                </tr>
+                                            ),
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <Notice title="Assignment remains separate">
+                                CSV imports do not assign employees. Imported
+                                inquiries enter the Dashboard as unassigned, and
+                                Super Admin assigns them from the inquiry table.
+                            </Notice>
+                        </section>
+
+                        <section
+                            id="follow-up"
+                            className="scroll-mt-24 space-y-5"
+                        >
+                            <SectionTitle
+                                icon={CalendarClock}
+                                eyebrow="Daily work"
+                                title="Follow-ups and discussion streams"
+                                description="Queues organize the day while the stream preserves the complete employee discussion history."
+                            />
+                            <div className="grid gap-5 lg:grid-cols-2">
+                                <div className="border">
+                                    <PanelHeader title="Follow-up queues" />
+                                    <Queue
+                                        name="Assigned today"
+                                        text="Inquiries assigned today that still need activity."
+                                    />
+                                    <Queue
+                                        name="Yesterday"
+                                        text="Overdue follow-ups scheduled for yesterday."
+                                    />
+                                    <Queue
+                                        name="Today"
+                                        text="Follow-ups due on the current Karachi date."
+                                    />
+                                    <Queue
+                                        name="Next 3 days"
+                                        text="Upcoming follow-ups over the next three days."
+                                    />
+                                </div>
+                                <div className="border">
+                                    <PanelHeader title="Discussion history" />
+                                    <CheckRow text="History appears on the right side of the inquiry modal." />
+                                    <CheckRow text="All shows the complete timeline; employee tabs filter by contributor." />
+                                    <CheckRow text="Every stream records the employee, response, timestamp, and status at that time." />
+                                    <CheckRow text="Employees with stream permission may add discussion even when they cannot edit details." />
+                                </div>
+                            </div>
+                        </section>
+
+                        <section
+                            id="reports"
+                            className="scroll-mt-24 space-y-5"
+                        >
+                            <SectionTitle
+                                icon={FileDown}
+                                eyebrow="Output"
+                                title="Reports and PDF letters"
+                                description="Generate operational reports from assigned inquiries and formal student invitation letters from eligible records."
+                            />
+                            <div className="grid gap-5 lg:grid-cols-2">
+                                <div className="border p-5">
+                                    <div className="flex items-center gap-2">
+                                        <Filter className="size-4 text-primary" />
+                                        <h3 className="text-sm font-semibold">
+                                            Inquiry report
+                                        </h3>
+                                    </div>
+                                    <ul className="mt-4 space-y-3">
+                                        <CheckItem text="Filter by campus, status, employee, and updated date range." />
+                                        <CheckItem text="Today Report uses the current Asia/Karachi date." />
+                                        <CheckItem text="Preview totals and non-zero status counts before download." />
+                                        <CheckItem text="PDF uses the Aurea Education branded report format." />
+                                    </ul>
+                                </div>
+                                <div className="border p-5">
+                                    <div className="flex items-center gap-2">
+                                        <GraduationCap className="size-4 text-primary" />
+                                        <h3 className="text-sm font-semibold">
+                                            Invitation letter
+                                        </h3>
+                                    </div>
+                                    <ul className="mt-4 space-y-3">
+                                        <CheckItem text="Set Postal Communication to Sent from inquiry edit mode." />
+                                        <CheckItem text="Use the PDF icon in the table or inquiry detail modal." />
+                                        <CheckItem text="The letter includes student, contact, program, campus, and address details." />
+                                        <CheckItem text="Filename follows student-inquiry-Student-Name.pdf." />
+                                    </ul>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section
+                            id="management"
+                            className="scroll-mt-24 space-y-5"
+                        >
+                            <SectionTitle
+                                icon={UsersRound}
+                                eyebrow="Administration"
+                                title="Manage the CRM workspace"
+                                description="Reference data and employee access determine what can be selected and what each person can do."
+                            />
+                            <div className="grid gap-3 md:grid-cols-2">
+                                <InfoPanel
+                                    icon={UsersRound}
+                                    title="Employees"
+                                    text="Super Admin maintains profile details, role, permissions, department, designation, campus, and contact information."
+                                />
+                                <InfoPanel
+                                    icon={Building2}
+                                    title="Campuses"
+                                    text="Create, edit, search, and toggle visibility. Turning a campus off hides its inquiries without deleting history."
+                                />
+                                <InfoPanel
+                                    icon={GraduationCap}
+                                    title="Programs"
+                                    text="Create and maintain program name, duration, and related reference information used by inquiries."
+                                />
+                                <InfoPanel
+                                    icon={LockKeyhole}
+                                    title="Profile and security"
+                                    text="Employees update their profile, password, two-factor authentication, passkeys, and theme preferences from Settings."
+                                />
+                            </div>
+                        </section>
+
+                        <section
+                            id="help"
+                            className="scroll-mt-24 space-y-5 pb-8"
+                        >
+                            <SectionTitle
+                                icon={AlertCircle}
+                                eyebrow="Support"
+                                title="Troubleshooting"
+                                description="Search the most common operational questions before escalating an issue."
+                            />
+                            <div className="relative max-w-2xl">
+                                <Search className="absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    value={search}
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                    className="h-11 pl-9"
+                                    placeholder="Search help topics"
+                                />
+                            </div>
+                            <div className="divide-y border">
+                                {(search.trim().length >= 2
+                                    ? matchingTopics
+                                    : helpTopics
+                                ).map((topic) => (
+                                    <details
+                                        key={topic.title}
+                                        className="group p-4 sm:p-5"
+                                    >
+                                        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-sm font-semibold">
+                                            {topic.title}
+                                            <ChevronRight className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
+                                        </summary>
+                                        <p className="mt-3 max-w-4xl text-sm leading-6 text-muted-foreground">
+                                            {topic.text}
+                                        </p>
+                                    </details>
+                                ))}
+                                {search.trim().length >= 2 &&
+                                    matchingTopics.length === 0 && (
+                                        <div className="p-8 text-center text-sm text-muted-foreground">
+                                            No help topic matches “
+                                            {search.trim()}”.
+                                        </div>
+                                    )}
+                            </div>
+                        </section>
+                    </main>
+                </div>
             </div>
         </>
     );
 }
 
-function SectionHeading({
+function SectionTitle({
     icon: Icon,
+    eyebrow,
     title,
     description,
 }: {
     icon: typeof BookOpen;
+    eyebrow: string;
     title: string;
     description: string;
 }) {
     return (
         <div className="flex items-start gap-3">
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <Icon className="size-4" />
+            <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Icon className="size-5" />
             </span>
             <div>
-                <h2 className="text-lg font-semibold">{title}</h2>
-                <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                <div className="text-xs font-semibold text-primary uppercase">
+                    {eyebrow}
+                </div>
+                <h2 className="mt-1 text-xl font-semibold">{title}</h2>
+                <p className="mt-1 max-w-4xl text-sm leading-6 text-muted-foreground">
                     {description}
                 </p>
             </div>
@@ -703,87 +621,55 @@ function SectionHeading({
     );
 }
 
-function Metric({
-    label,
-    value,
-    note,
-}: {
-    label: string;
-    value: string;
-    note: string;
-}) {
-    return (
-        <div className="crm-metric">
-            <div className="text-xs font-medium text-muted-foreground uppercase">
-                {label}
-            </div>
-            <div className="mt-1 text-2xl font-semibold">{value}</div>
-            <div className="mt-1 text-xs text-muted-foreground">{note}</div>
-        </div>
-    );
-}
-
-function PurposeBlock({
+function QuickAction({
+    href,
     icon: Icon,
     title,
     text,
 }: {
-    icon: typeof History;
+    href: string;
+    icon: typeof LayoutDashboard;
     title: string;
     text: string;
 }) {
     return (
-        <div className="border-b p-5 last:border-b-0 lg:border-r lg:border-b-0 lg:last:border-r-0">
-            <Icon className="mb-3 size-5 text-primary" />
-            <h3 className="text-sm font-semibold">{title}</h3>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                {text}
-            </p>
-        </div>
-    );
-}
-
-function ModuleCard({
-    title,
-    icon: Icon,
-    description,
-    features,
-}: (typeof modules)[number]) {
-    return (
-        <article className="bg-card p-5">
-            <span className="mb-4 flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
+        <a
+            href={href}
+            className="group flex items-start gap-3 border p-4 transition hover:border-primary/40 hover:bg-muted/30"
+        >
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
                 <Icon className="size-4" />
             </span>
-            <h3 className="text-sm font-semibold">{title}</h3>
-            <p className="mt-2 min-h-24 text-sm leading-6 text-muted-foreground">
-                {description}
-            </p>
-            <div className="mt-4 flex flex-wrap gap-1.5">
-                {features.map((feature) => (
-                    <Badge key={feature} variant="secondary">
-                        {feature}
-                    </Badge>
-                ))}
-            </div>
-        </article>
+            <span className="min-w-0 flex-1">
+                <span className="flex items-center justify-between gap-3 text-sm font-semibold">
+                    {title}
+                    <ArrowRight className="size-4 text-muted-foreground transition group-hover:translate-x-0.5 group-hover:text-primary" />
+                </span>
+                <span className="mt-1 block text-xs leading-5 text-muted-foreground">
+                    {text}
+                </span>
+            </span>
+        </a>
     );
 }
 
-function Feature({
-    icon: Icon,
+function GuideStep({
+    number,
     title,
     text,
 }: {
-    icon: typeof Filter;
+    number: number;
     title: string;
     text: string;
 }) {
     return (
-        <div className="flex gap-3">
-            <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+        <div className="grid gap-3 p-5 sm:grid-cols-[2.5rem_1fr]">
+            <span className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
+                {number}
+            </span>
             <div>
-                <div className="text-sm font-medium">{title}</div>
-                <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                <h3 className="text-sm font-semibold">{title}</h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     {text}
                 </p>
             </div>
@@ -791,7 +677,7 @@ function Feature({
     );
 }
 
-function Rule({
+function InfoPanel({
     icon: Icon,
     title,
     text,
@@ -801,7 +687,7 @@ function Rule({
     text: string;
 }) {
     return (
-        <div className="crm-panel p-4">
+        <div className="border p-4">
             <div className="flex items-center gap-2">
                 <Icon className="size-4 text-primary" />
                 <h3 className="text-sm font-semibold">{title}</h3>
@@ -813,136 +699,77 @@ function Rule({
     );
 }
 
-function Check({ text }: { text: string }) {
-    return (
-        <li className="flex gap-2.5 text-sm leading-6 text-muted-foreground">
-            <CheckCircle2 className="mt-1 size-4 shrink-0 text-primary" />
-            <span>{text}</span>
-        </li>
-    );
-}
-
-function Callout({
-    title,
-    children,
+function RoleRow({
+    role,
+    responsibility,
+    limit,
 }: {
-    title: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-            <div className="text-sm font-semibold text-primary">{title}</div>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                {children}
-            </p>
-        </div>
-    );
-}
-
-function RuleRow({
-    title,
-    children,
-}: {
-    title: string;
-    children: React.ReactNode;
-}) {
-    return (
-        <div className="p-4 sm:grid sm:grid-cols-[10rem_1fr] sm:gap-4 sm:p-5">
-            <h3 className="text-sm font-semibold">{title}</h3>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground sm:mt-0">
-                {children}
-            </p>
-        </div>
-    );
-}
-
-function QuickLink({
-    href,
-    icon: Icon,
-    title,
-    text,
-    download = false,
-}: {
-    href: string;
-    icon: typeof LayoutDashboard;
-    title: string;
-    text: string;
-    download?: boolean;
-}) {
-    return (
-        <a
-            href={href}
-            download={download || undefined}
-            className="group crm-panel flex items-start gap-3 p-4 transition-colors hover:border-primary/30 hover:bg-muted/25"
-        >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-                <Icon className="size-4" />
-            </span>
-            <span className="min-w-0 flex-1">
-                <span className="flex items-center justify-between gap-3 text-sm font-semibold">
-                    {title}
-                    <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
-                </span>
-                <span className="mt-1 block text-sm leading-5 text-muted-foreground">
-                    {text}
-                </span>
-            </span>
-        </a>
-    );
-}
-
-function WorkspaceGuide({
-    icon: Icon,
-    title,
-    audience,
-    points,
-}: {
-    icon: typeof LayoutDashboard;
-    title: string;
-    audience: string;
-    points: string[];
-}) {
-    return (
-        <article className="crm-panel p-5">
-            <div className="flex items-start justify-between gap-4 border-b pb-4">
-                <div className="flex items-center gap-3">
-                    <span className="flex size-9 items-center justify-center rounded-md bg-primary/10 text-primary">
-                        <Icon className="size-4" />
-                    </span>
-                    <div>
-                        <h3 className="text-sm font-semibold">{title}</h3>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                            {audience}
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <ul className="mt-4 space-y-3">
-                {points.map((point) => (
-                    <Check key={point} text={point} />
-                ))}
-            </ul>
-        </article>
-    );
-}
-
-function QueueRow({
-    name,
-    rule,
-    use,
-}: {
-    name: string;
-    rule: string;
-    use: string;
+    role: string;
+    responsibility: string;
+    limit: string;
 }) {
     return (
         <tr className="crm-table-row">
             <Td>
-                <Badge variant="secondary">{name}</Badge>
+                <Badge variant="secondary">{role}</Badge>
             </Td>
-            <Td>{rule}</Td>
-            <Td>{use}</Td>
+            <Td>{responsibility}</Td>
+            <Td>{limit}</Td>
         </tr>
+    );
+}
+
+function PanelHeader({ title }: { title: string }) {
+    return (
+        <div className="border-b bg-muted/30 px-4 py-3 text-sm font-semibold">
+            {title}
+        </div>
+    );
+}
+
+function Queue({ name, text }: { name: string; text: string }) {
+    return (
+        <div className="grid gap-2 border-b p-4 last:border-b-0 sm:grid-cols-[8rem_1fr]">
+            <span className="text-sm font-medium">{name}</span>
+            <span className="text-sm leading-6 text-muted-foreground">
+                {text}
+            </span>
+        </div>
+    );
+}
+
+function CheckRow({ text }: { text: string }) {
+    return (
+        <div className="flex gap-3 border-b p-4 last:border-b-0">
+            <Check className="mt-1 size-4 shrink-0 text-primary" />
+            <p className="text-sm leading-6 text-muted-foreground">{text}</p>
+        </div>
+    );
+}
+
+function CheckItem({ text }: { text: string }) {
+    return (
+        <li className="flex gap-2.5 text-sm leading-6 text-muted-foreground">
+            <CheckCircle2 className="mt-1 size-4 shrink-0 text-primary" />
+            {text}
+        </li>
+    );
+}
+
+function Notice({
+    title,
+    children,
+}: {
+    title: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="border-l-4 border-primary bg-primary/5 px-4 py-3">
+            <div className="text-sm font-semibold">{title}</div>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                {children}
+            </p>
+        </div>
     );
 }
 
@@ -959,5 +786,5 @@ function Td({ children }: { children: React.ReactNode }) {
 }
 
 DocumentationIndex.layout = () => ({
-    breadcrumbs: [{ title: 'Project Documentation', href: '/documentation' }],
+    breadcrumbs: [{ title: 'User Guide', href: '/documentation' }],
 });

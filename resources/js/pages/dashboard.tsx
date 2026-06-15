@@ -1,5 +1,3 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import type { FormEvent, ReactNode } from 'react';
 import { Head, router } from '@inertiajs/react';
 import {
     CalendarClock,
@@ -22,7 +20,10 @@ import {
     UserCheck,
     X,
 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 
+import { beginGlobalLoading } from '@/components/global-loading-overlay';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -43,6 +44,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { showErrorToast } from '@/hooks/use-flash-toast';
 
 // Types and utils
 type Option = { id: number; name: string };
@@ -201,7 +203,7 @@ export default function Dashboard({
     sourceOptions,
     statusOptions,
     departmentOptions,
-    postalCommunicationOptions,
+    postalCommunicationOptions = ['pending', 'send'],
     inquiryCreationDefaults,
     filterCounts,
     queueCounts,
@@ -265,6 +267,7 @@ export default function Dashboard({
         createInquiryDefaults,
     );
     const [importRows, setImportRows] = useState<InquiryForm[]>([]);
+    const [importFile, setImportFile] = useState<File | null>(null);
     const [streamText, setStreamText] = useState('');
     const [activeHistory, setActiveHistory] = useState('all');
     const [selectedInquiryIds, setSelectedInquiryIds] = useState<number[]>([]);
@@ -297,7 +300,9 @@ export default function Dashboard({
             { id: string; name: string; count: number }
         >();
         selected?.streams.forEach((stream) => {
-            if (!stream.user) return;
+            if (!stream.user) {
+                return;
+            }
 
             const id = String(stream.user.id);
             const existing = users.get(id);
@@ -324,33 +329,43 @@ export default function Dashboard({
         inquiries.every((inquiry) => selectedInquiryIds.includes(inquiry.id));
 
     useEffect(() => {
-        setSelected((current) => {
-            if (!current) return current;
+        const timer = window.setTimeout(() => {
+            setSelected((current) => {
+                if (!current) {
+                    return current;
+                }
 
-            return (
-                inquiries.find((inquiry) => inquiry.id === current.id) ??
-                current
-            );
-        });
+                return (
+                    inquiries.find((inquiry) => inquiry.id === current.id) ??
+                    current
+                );
+            });
+        }, 0);
+
+        return () => window.clearTimeout(timer);
     }, [inquiries]);
 
     useEffect(() => {
-        setFilterForm(filters);
+        const timer = window.setTimeout(() => setFilterForm(filters), 0);
+
+        return () => window.clearTimeout(timer);
     }, [filters]);
 
     useEffect(() => {
         const visibleIds = new Set(inquiries.map((inquiry) => inquiry.id));
-        setSelectedInquiryIds((current) =>
-            current.filter((id) => visibleIds.has(id)),
-        );
+        const timer = window.setTimeout(() => {
+            setSelectedInquiryIds((current) =>
+                current.filter((id) => visibleIds.has(id)),
+            );
+        }, 0);
+
+        return () => window.clearTimeout(timer);
     }, [inquiries]);
 
     useEffect(() => {
         const query = (filterForm.search ?? '').trim();
 
         if (query.length < 2) {
-            setSearchSuggestions([]);
-            setSearchLoading(false);
             return;
         }
 
@@ -368,7 +383,9 @@ export default function Dashboard({
                     signal: controller.signal,
                 });
 
-                if (!response.ok) throw new Error('Search failed.');
+                if (!response.ok) {
+                    throw new Error('Search failed.');
+                }
 
                 const payload = (await response.json()) as {
                     results: Inquiry[];
@@ -379,12 +396,15 @@ export default function Dashboard({
                 if (
                     error instanceof DOMException &&
                     error.name === 'AbortError'
-                )
+                ) {
                     return;
+                }
 
                 setSearchSuggestions([]);
             } finally {
-                if (!controller.signal.aborted) setSearchLoading(false);
+                if (!controller.signal.aborted) {
+                    setSearchLoading(false);
+                }
             }
         }, 300);
 
@@ -438,12 +458,20 @@ export default function Dashboard({
     const submitImport = () => {
         router.post(
             '/inquiries/import',
-            { rows: importRows.map(normalizeInquiry) },
             {
+                csv_file: importFile,
+                rows: importRows.map(normalizeInquiry),
+            },
+            {
+                forceFormData: true,
                 onSuccess: () => {
                     setImportOpen(false);
                     setImportRows([]);
-                    if (csvInputRef.current) csvInputRef.current.value = '';
+                    setImportFile(null);
+
+                    if (csvInputRef.current) {
+                        csvInputRef.current.value = '';
+                    }
                 },
             },
         );
@@ -451,7 +479,9 @@ export default function Dashboard({
 
     // The assignSelectedInquiries function is responsible for assigning the selected inquiries to a user in bulk. It checks if there is a user selected for assignment and if there are any inquiries selected. If both conditions are met, it sends a PATCH request to the server with the IDs of the selected inquiries and the ID of the user to assign them to. Upon successful assignment, it clears the selection and resets the bulk assigned user state.
     const assignSelectedInquiries = () => {
-        if (!bulkAssignedUserId || selectedInquiryIds.length === 0) return;
+        if (!bulkAssignedUserId || selectedInquiryIds.length === 0) {
+            return;
+        }
 
         router.patch(
             '/inquiries/assign',
@@ -496,10 +526,14 @@ export default function Dashboard({
     // The saveInquiryActivity function is responsible for saving a new activity or note to the selected inquiry. It first checks if there is a selected inquiry and if the stream text is not empty. If the stream text is empty, it sets an error message prompting the user to write a discussion note before submitting. If there is valid input, it sends a PATCH request to the server with the updated activity information. The payload of the request depends on whether the user has permission to update the inquiry; if they do, it includes all relevant fields, otherwise it only includes the response text. Upon successful update, it clears the stream text and handles any errors by setting an appropriate error message.
     const saveInquiryActivity = (event: FormEvent) => {
         event.preventDefault();
-        if (!selected) return;
+
+        if (!selected) {
+            return;
+        }
 
         if (!streamText.trim()) {
             setInquiryUpdateError('Write a discussion note before submitting.');
+
             return;
         }
 
@@ -554,14 +588,38 @@ export default function Dashboard({
     };
 
     const handleCsv = async (file?: File) => {
-        if (!file) return;
+        if (!file) {
+            return;
+        }
 
-        const rows = parseCsv(await file.text())
-            .map((row) => csvRowToInquiry(row, programs, activeCampuses))
-            .filter((row) => row.name || row.phone || row.email);
+        const finishLoading = beginGlobalLoading(
+            'Reading CSV file',
+            'Please wait while the inquiry rows are prepared for review.',
+        );
 
-        setImportRows(rows);
-        setImportOpen(true);
+        try {
+            const rows = parseCsv(await file.text())
+                .map((row) => csvRowToInquiry(row, programs, activeCampuses))
+                .filter((row) => row.name || row.phone || row.email);
+
+            if (rows.length === 0) {
+                throw new Error(
+                    'The CSV file does not contain any valid inquiry rows.',
+                );
+            }
+
+            setImportRows(rows);
+            setImportFile(file);
+            setImportOpen(true);
+        } catch (error) {
+            const message =
+                error instanceof Error
+                    ? error.message
+                    : 'The CSV file could not be read.';
+            showErrorToast(message);
+        } finally {
+            finishLoading();
+        }
     };
 
     const setTodayReport = () => {
@@ -577,6 +635,10 @@ export default function Dashboard({
         event.preventDefault();
         setReportLoading(true);
         setReportError('');
+        const finishLoading = beginGlobalLoading(
+            'Generating inquiry report',
+            'Please wait while the selected inquiry data is prepared.',
+        );
 
         try {
             const response = await fetch(
@@ -586,22 +648,25 @@ export default function Dashboard({
                 },
             );
 
-            if (!response.ok)
+            if (!response.ok) {
                 throw new Error(
                     'Unable to generate the report. Check the selected dates and try again.',
                 );
+            }
 
             setReport((await response.json()) as InquiryReport);
             setReportFilterOpen(false);
             setReportPreviewOpen(true);
         } catch (error) {
-            setReportError(
+            const message =
                 error instanceof Error
                     ? error.message
-                    : 'Unable to generate the report.',
-            );
+                    : 'Unable to generate the report.';
+            setReportError(message);
+            showErrorToast(message);
         } finally {
             setReportLoading(false);
+            finishLoading();
         }
     };
 
@@ -794,8 +859,9 @@ export default function Dashboard({
                                             setShowSearchSuggestions(true)
                                         }
                                         onKeyDown={(event) => {
-                                            if (event.key === 'Escape')
+                                            if (event.key === 'Escape') {
                                                 setShowSearchSuggestions(false);
+                                            }
                                         }}
                                         onChange={(event) => {
                                             setFilterForm({
@@ -805,9 +871,11 @@ export default function Dashboard({
                                             setShowSearchSuggestions(true);
                                         }}
                                     />
-                                    {searchLoading && (
-                                        <LoaderCircle className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
-                                    )}
+                                    {(filterForm.search ?? '').trim().length >=
+                                        2 &&
+                                        searchLoading && (
+                                            <LoaderCircle className="absolute top-1/2 right-3 size-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                                        )}
 
                                     {showSearchSuggestions &&
                                         (filterForm.search ?? '').trim()
@@ -1586,6 +1654,12 @@ export default function Dashboard({
                             dashboard.
                         </DialogDescription>
                     </DialogHeader>
+                    {importFile && (
+                        <div className="rounded-md border bg-muted/25 px-3 py-2 text-sm">
+                            <span className="font-medium">File:</span>{' '}
+                            {importFile.name}
+                        </div>
+                    )}
                     <div className="relative max-h-[60vh] overflow-auto rounded-md border">
                         <table className="w-full min-w-[1100px] text-sm">
                             <thead className="sticky top-0 z-10 bg-muted text-muted-foreground shadow-[inset_0_-1px_0_var(--border)]">
@@ -1665,6 +1739,7 @@ export default function Dashboard({
                 open={detailOpen}
                 onOpenChange={(open) => {
                     setDetailOpen(open);
+
                     if (!open) {
                         setEditingInquiryDetails(false);
                         setInquiryBeforeEdit(null);
@@ -1716,6 +1791,7 @@ export default function Dashboard({
                                                                     inquiryBeforeEdit,
                                                                 );
                                                             }
+
                                                             setEditingInquiryDetails(
                                                                 false,
                                                             );
@@ -2445,7 +2521,9 @@ function PaginationControls({
     };
 }) {
     const visitPage = (url: string | null) => {
-        if (!url) return;
+        if (!url) {
+            return;
+        }
 
         router.visit(url, {
             preserveScroll: true,
@@ -2493,7 +2571,9 @@ function reportQuery(filters: ReportFilters): string {
     const params = new URLSearchParams();
 
     Object.entries(filters).forEach(([key, value]) => {
-        if (value) params.set(key, value);
+        if (value) {
+            params.set(key, value);
+        }
     });
 
     return params.toString();
@@ -2759,7 +2839,9 @@ function StreamStatusBadge({ status }: { status: string | null }) {
 }
 
 function employeeInitials(name?: string): string {
-    if (!name) return '?';
+    if (!name) {
+        return '?';
+    }
 
     return name
         .trim()
@@ -2851,7 +2933,10 @@ function parseCsv(text: string): Record<string, string>[] {
             row.push(cell.trim());
             cell = '';
         } else if ((char === '\n' || char === '\r') && !quoted) {
-            if (char === '\r' && next === '\n') index += 1;
+            if (char === '\r' && next === '\n') {
+                index += 1;
+            }
+
             row.push(cell.trim());
             rows.push(row);
             row = [];

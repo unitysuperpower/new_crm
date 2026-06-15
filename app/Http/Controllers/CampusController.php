@@ -64,7 +64,8 @@ class CampusController extends Controller
 
         return back()->with('success', 'Campus created.');
     }
-    // The update method allows authorized users to modify the details of an existing campus, ensuring that the information remains accurate and up-to-date as the campus progresses through different stages of development.                       
+
+    // The update method allows authorized users to modify the details of an existing campus, ensuring that the information remains accurate and up-to-date as the campus progresses through different stages of development.
     public function update(UpdateCampusRequest $request, Campus $campus): RedirectResponse
     {
         $campus->update($request->validated());

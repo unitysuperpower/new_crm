@@ -13,8 +13,7 @@ use Inertia\Response;
 
 class ProgramController extends Controller
 {
-
-// The index method retrieves and displays a list of programs, allowing for optional search filtering, and provides metrics on the total number of programs, those with inquiries, and those without inquiries, while ensuring that the user has the necessary permissions to view the programs.
+    // The index method retrieves and displays a list of programs, allowing for optional search filtering, and provides metrics on the total number of programs, those with inquiries, and those without inquiries, while ensuring that the user has the necessary permissions to view the programs.
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Program::class);

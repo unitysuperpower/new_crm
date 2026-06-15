@@ -20,12 +20,15 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response as HttpResponse;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class InquiryController extends Controller
 {
+    // The index method retrieves and displays a paginated list of inquiries based on various filters and user permissions, providing an overview of the inquiries in the system and allowing users to easily navigate and manage them through the dashboard interface.
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Inquiry::class);
@@ -128,6 +131,7 @@ class InquiryController extends Controller
                 ->values(),
             'statusOptions' => InquiryOptions::STATUSES,
             'departmentOptions' => InquiryOptions::DEPARTMENTS,
+            'postalCommunicationOptions' => InquiryOptions::POSTAL_COMMUNICATIONS,
             'inquiryCreationDefaults' => [
                 'assigned_user_id' => (string) $request->user()->id,
                 'department' => $request->user()->department ?? 'admission',
@@ -144,6 +148,8 @@ class InquiryController extends Controller
             ],
         ]);
     }
+
+    // The store method handles the creation of a new inquiry, validating the incoming request data, assigning the inquiry to the appropriate user and department based on the creator's role, and saving it to the database, ensuring that new inquiries are properly recorded and assigned for follow-up.
 
     public function store(StoreInquiryRequest $request): RedirectResponse
     {
@@ -164,6 +170,7 @@ class InquiryController extends Controller
         return back()->with('success', 'Inquiry created.');
     }
 
+    // The report method generates a JSON response containing a filtered list of inquiries along with aggregated counts based on the provided filters, allowing users to analyze and export inquiry data for reporting purposes.
     public function report(Request $request): JsonResponse
     {
         Gate::authorize('viewAny', Inquiry::class);
@@ -174,6 +181,7 @@ class InquiryController extends Controller
         return response()->json($this->reportPayload($inquiries, $filters));
     }
 
+    // The reportPdf method generates a PDF report containing a filtered list of inquiries along with aggregated counts based on the provided filters, allowing users to download and print inquiry data for reporting purposes.
     public function reportPdf(Request $request): HttpResponse
     {
         Gate::authorize('viewAny', Inquiry::class);
@@ -181,6 +189,10 @@ class InquiryController extends Controller
         $filters = $this->validateReportFilters($request);
         $inquiries = $this->reportQuery($request, $filters)->get();
         $payload = $this->reportPayload($inquiries, $filters);
+        $logoPath = public_path('logo.jpeg');
+        $payload['logoData'] = file_exists($logoPath)
+            ? 'data:image/jpeg;base64,'.base64_encode(file_get_contents($logoPath))
+            : null;
 
         $options = new Options;
         $options->set('defaultFont', 'DejaVu Sans');
@@ -198,12 +210,47 @@ class InquiryController extends Controller
         ]);
     }
 
+    // The invitationLetter method generates a PDF invitation letter for a specific inquiry, ensuring that only authorized users can access it and that the inquiry has been marked for postal communication, providing a professional and personalized invitation for the prospective student.
+
+    public function invitationLetter(Request $request, Inquiry $inquiry): HttpResponse
+    {
+        Gate::authorize('view', $inquiry);
+        abort_unless($inquiry->postal_communication === 'send', 404);
+
+        $inquiry->loadMissing(['program:id,name', 'campusModel:id,name']);
+        $logoPath = public_path('logo.jpeg');
+        $logoData = file_exists($logoPath)
+            ? 'data:image/jpeg;base64,'.base64_encode(file_get_contents($logoPath))
+            : null;
+
+        $options = new Options;
+        $options->set('defaultFont', 'DejaVu Sans');
+
+        $pdf = new Dompdf($options);
+        $pdf->loadHtml(view('letters.inquiry-invitation', [
+            'inquiry' => $inquiry,
+            'logoData' => $logoData,
+            'programName' => $inquiry->program?->name ?? 'the selected academic program',
+            'campusName' => $inquiry->campusModel?->name ?? $inquiry->campus ?? 'Aurea Education',
+        ])->render());
+        $pdf->setPaper('a4', 'portrait');
+        $pdf->render();
+
+        $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '-', $inquiry->name) ?: 'student';
+
+        return response($pdf->output(), 200, [
+            'Content-Disposition' => 'attachment; filename="student-inquiry-'.$safeName.'.pdf"',
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
     // The import method allows authorized users to bulk import multiple inquiries at once, significantly reducing the time and effort required to add large volumes of inquiries into the system, especially when migrating from another platform or onboarding a new batch of leads.
     public function import(Request $request): RedirectResponse
     {
         Gate::authorize('import', Inquiry::class);
 
         $validated = $request->validate([
+            'csv_file' => ['nullable', 'file', 'mimes:csv,txt', 'max:5120'],
             'rows' => ['required', 'array', 'min:1', 'max:500'],
             'rows.*.name' => ['required', 'string', 'max:255'],
             'rows.*.phone' => ['required', 'string', 'max:50'],
@@ -225,22 +272,110 @@ class InquiryController extends Controller
             'rows.*.message' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        DB::transaction(function () use ($validated) {
-            foreach ($validated['rows'] as $row) {
-                if (empty($row['campus_id']) && ! empty($row['campus'])) {
-                    $row['campus_id'] = Campus::query()
-                        ->where('is_active', true)
-                        ->whereRaw('LOWER(name) = ?', [mb_strtolower($row['campus'])])
-                        ->value('id');
-                }
+        $existingPhones = Inquiry::query()
+            ->pluck('phone')
+            ->mapWithKeys(fn (string $phone) => [$this->normalizePhone($phone) => true])
+            ->filter(fn (bool $exists, string $phone) => $phone !== '');
+        $existingEmails = Inquiry::query()
+            ->whereNotNull('email')
+            ->pluck('email')
+            ->mapWithKeys(fn (string $email) => [$this->normalizeEmail($email) => true])
+            ->filter(fn (bool $exists, string $email) => $email !== '');
+        $seenPhones = [];
+        $seenEmails = [];
+        $duplicateCount = 0;
+        $rowsToImport = [];
 
-                Inquiry::create($row);
+        foreach ($validated['rows'] as $row) {
+            $phone = $this->normalizePhone($row['phone']);
+            $email = $this->normalizeEmail($row['email'] ?? null);
+            $isDuplicate = isset($existingPhones[$phone])
+                || isset($seenPhones[$phone])
+                || ($email !== '' && (isset($existingEmails[$email]) || isset($seenEmails[$email])));
+
+            if ($isDuplicate) {
+                $duplicateCount++;
+
+                continue;
             }
-        });
 
-        return back()->with('success', count($validated['rows']).' inquiries imported.');
+            $seenPhones[$phone] = true;
+
+            if ($email !== '') {
+                $seenEmails[$email] = true;
+            }
+
+            $rowsToImport[] = $row;
+        }
+
+        $storedPath = $this->storeInquiryImportFile($request);
+
+        try {
+            DB::transaction(function () use ($rowsToImport) {
+                foreach ($rowsToImport as $row) {
+                    if (empty($row['campus_id']) && ! empty($row['campus'])) {
+                        $row['campus_id'] = Campus::query()
+                            ->where('is_active', true)
+                            ->whereRaw('LOWER(name) = ?', [mb_strtolower($row['campus'])])
+                            ->value('id');
+                    }
+
+                    Inquiry::create($row);
+                }
+            });
+        } catch (\Throwable $exception) {
+            if ($storedPath) {
+                Storage::disk('local')->delete($storedPath);
+            }
+
+            throw $exception;
+        }
+
+        $message = count($rowsToImport).' inquiries imported.';
+
+        if ($duplicateCount > 0) {
+            $message .= ' '.$duplicateCount.' duplicate inquiries skipped.';
+        }
+
+        if ($storedPath) {
+            $message .= ' CSV archived as '.basename($storedPath).'.';
+        }
+
+        return back()->with('success', $message);
     }
 
+    private function storeInquiryImportFile(Request $request): ?string
+    {
+        $file = $request->file('csv_file');
+
+        if (! $file) {
+            return null;
+        }
+
+        $originalName = Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME));
+        $originalName = $originalName !== '' ? $originalName : 'upload';
+        $filename = 'inquiries-'.now()->format('Y-m-d_His').'-'.$originalName.'-'.Str::lower(Str::random(6)).'.csv';
+
+        $path = $file->storeAs('inquiry-imports', $filename, 'local');
+
+        if (! $path) {
+            throw new \RuntimeException('The CSV file could not be archived.');
+        }
+
+        return $path;
+    }
+
+    private function normalizePhone(?string $phone): string
+    {
+        return preg_replace('/\D+/', '', $phone ?? '') ?? '';
+    }
+
+    private function normalizeEmail(?string $email): string
+    {
+        return mb_strtolower(trim($email ?? ''));
+    }
+
+    // The search method provides a JSON response containing a list of inquiries that match the search query, allowing users to quickly find specific inquiries based on their name, phone number, or email, and ensuring that the search results are relevant and accessible based on the user's permissions and the inquiry's assignment status.
     public function search(Request $request): JsonResponse
     {
         Gate::authorize('viewAny', Inquiry::class);
@@ -294,6 +429,7 @@ class InquiryController extends Controller
         return back()->with('success', count($validated['inquiry_ids']).' inquiries assigned.');
     }
 
+    // The saveActivity method allows authorized users to add a new activity stream entry for a specific inquiry, optionally updating the inquiry's details and status, and ensuring that all changes are recorded in a single transaction for data integrity and consistency.
     public function saveActivity(SaveInquiryActivityRequest $request, Inquiry $inquiry): RedirectResponse
     {
         $validated = $request->validated();
@@ -315,6 +451,7 @@ class InquiryController extends Controller
                     'message' => $validated['message'] ?? null,
                     'status' => $validated['status'],
                     'department' => $validated['department'],
+                    'postal_communication' => $validated['postal_communication'],
                     'next_follow_up_at' => $validated['next_follow_up_at'] ?? null,
                 ];
 
@@ -331,7 +468,6 @@ class InquiryController extends Controller
                     'last_status' => $inquiry->status,
                 ]);
             }
-
 
             if ($canUpdate || $response !== '') {
                 $inquiry->update(['last_activity_at' => now()]);
@@ -366,6 +502,7 @@ class InquiryController extends Controller
             'assigned_user_id' => $inquiry->assigned_user_id,
             'assigned_user' => $inquiry->assignedUser?->only(['id', 'name']),
             'department' => $inquiry->department,
+            'postal_communication' => $inquiry->postal_communication,
             'next_follow_up_at' => $inquiry->next_follow_up_at?->format('Y-m-d'),
             'assigned_at' => $inquiry->assigned_at?->format('M d, Y h:i A'),
             'last_activity_at' => $inquiry->last_activity_at?->format('M d, Y h:i A'),
@@ -383,6 +520,7 @@ class InquiryController extends Controller
         ];
     }
 
+    // The visibleInquiryQuery method constructs a base query for retrieving inquiries that are visible to the current user, applying filters based on campus activity and assignment status, ensuring that users only see inquiries they are authorized to access.
     private function visibleInquiryQuery(Request $request, bool $assignedOnly): Builder
     {
         return Inquiry::query()
@@ -396,7 +534,7 @@ class InquiryController extends Controller
             );
     }
 
-
+    // The workspaceQuery method builds upon the visibleInquiryQuery by applying additional filters based on the specified queue, allowing for dynamic retrieval of inquiries based on their assignment and follow-up status, and ensuring that the resulting query is tailored to the context of the dashboard or inquiry page.
     private function workspaceQuery(Request $request, bool $isInquiryPage, string $queue): Builder
     {
         return $this->visibleInquiryQuery($request, $isInquiryPage)
@@ -427,6 +565,7 @@ class InquiryController extends Controller
             );
     }
 
+    // The filterCounts method calculates the count of inquiries grouped by various attributes such as status, department, source, campus, and assigned user, based on the current filters and queue selection, providing aggregated data for the frontend to display filter counts and help users understand the distribution of inquiries across different categories.
     private function filterCounts(Request $request, bool $assignedOnly, string $queue): array
     {
         $base = $this->workspaceQuery($request, $assignedOnly, $queue);
@@ -452,6 +591,7 @@ class InquiryController extends Controller
         ];
     }
 
+    // The queueCounts method calculates the count of inquiries based on their assignment and follow-up status for the dashboard and inquiry pages, providing key metrics such as total inquiries, inquiries assigned today, and follow-ups scheduled for yesterday, today, and the next three days, helping users prioritize their work and manage their inquiry queues effectively.
     private function queueCounts(Request $request, bool $isInquiryPage): array
     {
         $workspaceScope = $this->visibleInquiryQuery($request, $isInquiryPage);
@@ -479,6 +619,7 @@ class InquiryController extends Controller
         ];
     }
 
+    // The validateReportFilters method validates the incoming request parameters for generating the inquiry report, ensuring that the filters provided by the user are in the correct format and reference existing records where applicable, which helps maintain data integrity and prevents errors during report generation.
     private function validateReportFilters(Request $request): array
     {
         return $request->validate([
@@ -490,6 +631,7 @@ class InquiryController extends Controller
         ]);
     }
 
+    // The reportQuery method constructs a query builder instance for retrieving inquiries based on the specified filters for the inquiry report, applying conditions for campus activity, assignment status, and other attributes, and ensuring that the resulting dataset is tailored to the reporting requirements and user permissions.
     private function reportQuery(Request $request, array $filters): Builder
     {
         $canSelectUser = $request->user()->can('assign', Inquiry::class);
@@ -516,6 +658,7 @@ class InquiryController extends Controller
             ->latest('updated_at');
     }
 
+    // The reportPayload method prepares the data structure for the inquiry report, including metadata about the report generation time and applied filters, aggregated counts of inquiries by status, and a detailed list of inquiries with their relevant attributes, ensuring that the report contains comprehensive information for analysis and presentation in both JSON and PDF formats.
     private function reportPayload($inquiries, array $filters): array
     {
         return [

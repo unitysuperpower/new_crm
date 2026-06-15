@@ -1,4 +1,3 @@
-import { FormEvent, useState } from 'react';
 import { Head, router } from '@inertiajs/react';
 import {
     Building2,
@@ -10,6 +9,8 @@ import {
     Search,
     Trash2,
 } from 'lucide-react';
+import type { FormEvent } from 'react';
+import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -111,6 +112,7 @@ export default function CampusesIndex({
 
         if (editingCampus) {
             router.patch(`/campuses/${editingCampus.id}`, payload, options);
+
             return;
         }
 
@@ -118,7 +120,9 @@ export default function CampusesIndex({
     };
 
     const deleteCampus = (campus: Campus) => {
-        if (!campus.can_delete) return;
+        if (!campus.can_delete) {
+            return;
+        }
 
         router.delete(`/campuses/${campus.id}`, {
             preserveScroll: true,

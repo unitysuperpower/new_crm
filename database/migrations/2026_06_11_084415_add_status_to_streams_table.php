@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('streams', function (Blueprint $table) {
             //
-                $table->string('last_status')->nullable()->after('inquiry_id');
+            $table->string('last_status')->nullable()->after('inquiry_id');
         });
     }
 

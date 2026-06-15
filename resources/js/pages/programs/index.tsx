@@ -1,6 +1,7 @@
-import { FormEvent, useState } from 'react';
 import { Head, router } from '@inertiajs/react';
 import { Edit3, GraduationCap, Plus, Search, Trash2 } from 'lucide-react';
+import type { FormEvent } from 'react';
+import { useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -98,6 +99,7 @@ export default function ProgramsIndex({
 
         if (editingProgram) {
             router.patch(`/programs/${editingProgram.id}`, payload, options);
+
             return;
         }
 
@@ -105,7 +107,9 @@ export default function ProgramsIndex({
     };
 
     const deleteProgram = (program: Program) => {
-        if (!program.can_delete) return;
+        if (!program.can_delete) {
+            return;
+        }
 
         router.delete(`/programs/${program.id}`, {
             preserveScroll: true,

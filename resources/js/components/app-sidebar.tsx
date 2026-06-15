@@ -1,5 +1,4 @@
 import { Link, router, usePage } from '@inertiajs/react';
-import { useState } from 'react';
 import {
     BookOpen,
     Building2,
@@ -10,6 +9,7 @@ import {
     Sun,
     UsersRound,
 } from 'lucide-react';
+import { useState } from 'react';
 import AppLogo from '@/components/app-logo';
 import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';

@@ -8,6 +8,8 @@ use App\Models\Inquiry;
 use App\Models\Stream;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -277,6 +279,65 @@ class InquiryWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_csv_import_archives_the_file_and_skips_duplicate_inquiries(): void
+    {
+        Storage::fake('local');
+        $superAdmin = User::factory()->create(['role' => UserRole::SuperAdmin]);
+        $this->createInquiry([
+            'phone' => '0300-111-2222',
+            'email' => 'existing@example.com',
+        ]);
+
+        $response = $this->actingAs($superAdmin)
+            ->post(route('inquiries.import'), [
+                'csv_file' => UploadedFile::fake()->createWithContent(
+                    'June Admissions.csv',
+                    "name,phone,email\nExisting,03001112222,new@example.com\nNew Student,03009998888,new@example.com",
+                ),
+                'rows' => [
+                    [
+                        'name' => 'Existing Student',
+                        'phone' => '03001112222',
+                        'email' => 'different@example.com',
+                        'status' => 'pending',
+                        'department' => 'admission',
+                    ],
+                    [
+                        'name' => 'New Student',
+                        'phone' => '03009998888',
+                        'email' => 'new@example.com',
+                        'status' => 'pending',
+                        'department' => 'admission',
+                    ],
+                    [
+                        'name' => 'Repeated New Student',
+                        'phone' => '03008887777',
+                        'email' => 'NEW@example.com',
+                        'status' => 'pending',
+                        'department' => 'admission',
+                    ],
+                ],
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success', function (string $message): bool {
+            return str_contains($message, '1 inquiries imported.')
+                && str_contains($message, '2 duplicate inquiries skipped.')
+                && str_contains($message, 'CSV archived as inquiries-');
+        });
+
+        $this->assertDatabaseHas('inquiries', ['name' => 'New Student']);
+        $this->assertDatabaseMissing('inquiries', ['name' => 'Existing Student']);
+        $this->assertDatabaseMissing('inquiries', ['name' => 'Repeated New Student']);
+
+        $files = Storage::disk('local')->files('inquiry-imports');
+        $this->assertCount(1, $files);
+        $this->assertMatchesRegularExpression(
+            '/^inquiry-imports\/inquiries-\d{4}-\d{2}-\d{2}_\d{6}-june-admissions-[a-z0-9]{6}\.csv$/',
+            $files[0],
+        );
+    }
+
     public function test_ajax_search_returns_only_the_users_assigned_inquiries(): void
     {
         $user = User::factory()->create();
@@ -485,7 +546,7 @@ class InquiryWorkflowTest extends TestCase
 
         $response->assertOk()
             ->assertHeader('content-type', 'application/pdf')
-            ->assertDownload('invitation-letter-Letter-Student.pdf');
+            ->assertDownload('student-inquiry-Letter-Student.pdf');
 
         $this->assertStringStartsWith('%PDF', $response->getContent());
     }
