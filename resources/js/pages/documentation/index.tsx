@@ -14,12 +14,15 @@ import {
     FileSpreadsheet,
     Filter,
     GraduationCap,
+    Globe2,
     History,
     LayoutDashboard,
     LockKeyhole,
     Search,
+    ServerCog,
     ShieldCheck,
     Sparkles,
+    TerminalSquare,
     Upload,
     UserCheck,
     UsersRound,
@@ -38,6 +41,7 @@ const navigation = [
     ['follow-up', 'Follow-ups and streams', CalendarClock],
     ['reports', 'Reports and letters', FileDown],
     ['management', 'System management', Building2],
+    ['hosting', 'Hostinger setup', ServerCog],
     ['help', 'Troubleshooting', AlertCircle],
 ] as const;
 
@@ -538,6 +542,78 @@ export default function DocumentationIndex() {
                         </section>
 
                         <section
+                            id="hosting"
+                            className="scroll-mt-24 space-y-5"
+                        >
+                            <SectionTitle
+                                icon={ServerCog}
+                                eyebrow="Deployment"
+                                title="Hostinger and cPanel setup"
+                                description="Use this checklist when moving the CRM from local Docker to a live Hostinger account."
+                            />
+                            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+                                <div className="space-y-4">
+                                    <HostStep
+                                        number={1}
+                                        title="Build the project before upload"
+                                        text="Run composer install for production dependencies and npm run build so the Vite assets are available in public/build."
+                                        command="composer install --no-dev --optimize-autoloader && npm install && npm run build"
+                                    />
+                                    <HostStep
+                                        number={2}
+                                        title="Set the document root to public"
+                                        text="The domain should point to the Laravel public folder, not the project root. This protects .env, storage, and application code."
+                                        command="/home/youruser/aurea-crm/public"
+                                    />
+                                    <HostStep
+                                        number={3}
+                                        title="Create production environment"
+                                        text="Create the Hostinger MySQL database, update .env with live credentials, set APP_DEBUG=false, and generate APP_KEY."
+                                        command="php artisan key:generate --force"
+                                    />
+                                    <HostStep
+                                        number={4}
+                                        title="Run Laravel server commands"
+                                        text="Run migrations, create the storage link, and rebuild Laravel caches after the final .env file is ready."
+                                        command="php artisan migrate --force && php artisan storage:link && php artisan optimize"
+                                    />
+                                </div>
+                                <div className="space-y-3">
+                                    <InfoPanel
+                                        icon={Globe2}
+                                        title="Live URL"
+                                        text="Set APP_URL to the exact https domain that users will open."
+                                    />
+                                    <InfoPanel
+                                        icon={TerminalSquare}
+                                        title="Server terminal"
+                                        text="Use Hostinger SSH terminal when available. If SSH is not enabled, upload the built project and ask Hostinger support to run the artisan commands."
+                                    />
+                                    <InfoPanel
+                                        icon={LockKeyhole}
+                                        title="Writable folders"
+                                        text="storage and bootstrap/cache must be writable by PHP or uploads, sessions, logs, and cache will fail."
+                                    />
+                                    <Notice title="Repository guide">
+                                        A full deployment checklist is saved in
+                                        HOSTINGER_CPANEL_DEPLOYMENT.md at the
+                                        project root.
+                                    </Notice>
+                                    <Button
+                                        asChild
+                                        variant="outline"
+                                        className="w-full justify-start"
+                                    >
+                                        <a href="/documentation/hostinger-cpanel-deployment.md">
+                                            <Download />
+                                            Download Hostinger guide
+                                        </a>
+                                    </Button>
+                                </div>
+                            </div>
+                        </section>
+
+                        <section
                             id="help"
                             className="scroll-mt-24 space-y-5 pb-8"
                         >
@@ -579,8 +655,8 @@ export default function DocumentationIndex() {
                                 {search.trim().length >= 2 &&
                                     matchingTopics.length === 0 && (
                                         <div className="p-8 text-center text-sm text-muted-foreground">
-                                            No help topic matches “
-                                            {search.trim()}”.
+                                            No help topic matches "
+                                            {search.trim()}".
                                         </div>
                                     )}
                             </div>
@@ -672,6 +748,37 @@ function GuideStep({
                 <p className="mt-1 text-sm leading-6 text-muted-foreground">
                     {text}
                 </p>
+            </div>
+        </div>
+    );
+}
+
+function HostStep({
+    number,
+    title,
+    text,
+    command,
+}: {
+    number: number;
+    title: string;
+    text: string;
+    command: string;
+}) {
+    return (
+        <div className="border p-5">
+            <div className="flex items-start gap-3">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-xs font-semibold text-primary">
+                    {number}
+                </span>
+                <div className="min-w-0 flex-1">
+                    <h3 className="text-sm font-semibold">{title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                        {text}
+                    </p>
+                    <code className="mt-3 block overflow-x-auto rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                        {command}
+                    </code>
+                </div>
             </div>
         </div>
     );

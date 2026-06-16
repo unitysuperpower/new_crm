@@ -20,6 +20,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             'Content-Type' => 'text/csv',
         ]);
     })->name('documentation.sample-inquiries');
+    Route::get('documentation/hostinger-cpanel-deployment.md', function () {
+        $path = base_path('HOSTINGER_CPANEL_DEPLOYMENT.md');
+
+        abort_unless(file_exists($path), 404);
+
+        return response()->download($path, 'HOSTINGER_CPANEL_DEPLOYMENT.md', [
+            'Content-Type' => 'text/markdown',
+        ]);
+    })->name('documentation.hostinger-deployment');
     Route::get('inquiries', [InquiryController::class, 'index'])->name('inquiries.index');
     Route::get('inquiries/search', [InquiryController::class, 'search'])->name('inquiries.search');
     Route::get('inquiries/report', [InquiryController::class, 'report'])->name('inquiries.report');
