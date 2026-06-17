@@ -6,7 +6,7 @@ use App\Http\Controllers\ProgramController;
 use App\Http\Controllers\StreamController;
 use Illuminate\Support\Facades\Route;
 
-Route::inertia('/', 'welcome')->name('home');
+Route::redirect('/', '/login')->name('home');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', [InquiryController::class, 'index'])->name('dashboard');

@@ -7,7 +7,7 @@ export default function AppLogo() {
             <div className="ml-1 grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">Aurea Education</span>
                 <span className="truncate text-[11px] text-sidebar-foreground/55">
-                    Inquiry CRM
+                    Inquiry to Pass out Certificate management system
                 </span>
             </div>
         </>

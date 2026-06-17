@@ -1,9 +1,8 @@
 import { Form, Head } from '@inertiajs/react';
+import { LockKeyhole, UserRound } from 'lucide-react';
 import InputError from '@/components/input-error';
-import PasswordInput from '@/components/password-input';
 import TextLink from '@/components/text-link';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
@@ -29,63 +28,79 @@ export default function Login({ status, canResetPassword }: Props) {
                     <>
                         <div className="grid gap-5">
                             <div className="grid gap-2">
-                                <Label htmlFor="email">Email address</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    name="email"
-                                    required
-                                    autoFocus
-                                    tabIndex={1}
-                                    autoComplete="email"
-                                    placeholder="name@aurea.edu.pk"
-                                />
+                                <Label
+                                    htmlFor="email"
+                                    className="text-base font-medium tracking-wide text-[#1f314f]"
+                                >
+                                    Email/Username
+                                </Label>
+                                <div className="relative">
+                                    <UserRound className="absolute top-1/2 left-5 size-4 -translate-y-1/2 text-[#3f4a5d]" />
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        name="email"
+                                        required
+                                        autoFocus
+                                        tabIndex={1}
+                                        autoComplete="email"
+                                        placeholder="name@aurea.edu.pk"
+                                        className="h-[54px] rounded-full border-[#cbd4e2] bg-[#e7eefb] pr-5 pl-15 text-base text-black shadow-inner focus-visible:border-[#8ab8fb] focus-visible:ring-[#9fc4ff]"
+                                    />
+                                </div>
                                 <InputError message={errors.email} />
                             </div>
 
                             <div className="grid gap-2">
-                                <div className="flex items-center">
-                                    <Label htmlFor="password">Password</Label>
-                                    {canResetPassword && (
-                                        <TextLink
-                                            href={request()}
-                                            className="ml-auto text-sm"
-                                            tabIndex={5}
-                                        >
-                                            Forgot your password?
-                                        </TextLink>
-                                    )}
+                                <Label
+                                    htmlFor="password"
+                                    className="text-base font-medium tracking-wide text-[#1f314f]"
+                                >
+                                    Password
+                                </Label>
+                                <div className="relative">
+                                    <LockKeyhole className="absolute top-1/2 left-5 size-4 -translate-y-1/2 text-[#3f4a5d]" />
+                                    <Input
+                                        id="password"
+                                        type="password"
+                                        name="password"
+                                        required
+                                        tabIndex={2}
+                                        autoComplete="current-password"
+                                        placeholder="Password"
+                                        className="h-[48px] rounded-full border-[#cbd4e2] bg-[#e7eefb] pr-5 pl-15 text-base text-black shadow-inner focus-visible:border-[#8ab8fb] focus-visible:ring-[#9fc4ff]"
+                                    />
                                 </div>
-                                <PasswordInput
-                                    id="password"
-                                    name="password"
-                                    required
-                                    tabIndex={2}
-                                    autoComplete="current-password"
-                                    placeholder="Password"
-                                />
                                 <InputError message={errors.password} />
-                            </div>
-
-                            <div className="flex items-center space-x-3 rounded-md border bg-muted/20 px-3 py-2.5">
-                                <Checkbox
-                                    id="remember"
-                                    name="remember"
-                                    tabIndex={3}
-                                />
-                                <Label htmlFor="remember">Remember me</Label>
                             </div>
 
                             <Button
                                 type="submit"
-                                className="mt-1 w-full"
-                                tabIndex={4}
+                                className="mt-2 h-[48px] w-full rounded-full bg-[#2d3d66] text-lg font-semibold text-white shadow-none hover:bg-[#243457]"
+                                tabIndex={3}
                                 disabled={processing}
                                 data-test="login-button"
                             >
                                 {processing && <Spinner />}
-                                Log in
+                                Continue
                             </Button>
+
+                            {canResetPassword && (
+                                <p className="text-base tracking-wide text-[#1f314f]">
+                                    I Forgot my Password? click{' '}
+                                    <TextLink
+                                        href={request()}
+                                        className="font-semibold text-[#17284b] no-underline hover:underline"
+                                        tabIndex={4}
+                                    >
+                                        here
+                                    </TextLink>
+                                </p>
+                            )}
+
+                            <div className="border-t border-[#cfd3da] pt-9 text-base tracking-wide text-[#102449]">
+                                Aurea Website: www.aurea.edu.pk
+                            </div>
                         </div>
                     </>
                 )}
@@ -101,6 +116,6 @@ export default function Login({ status, canResetPassword }: Props) {
 }
 
 Login.layout = {
-    title: 'Welcome back',
-    description: 'Use your employee account to access the Aurea Education CRM.',
+    title: 'Login',
+    description: 'Login to AUREA EDUCATION PORTAL',
 };
