@@ -76,7 +76,7 @@ class CampusController extends Controller
     // The toggle method allows authorized users to enable or disable a campus by updating its active status, ensuring that the campus can be easily managed without needing to delete it, and providing feedback on the action taken.
     public function toggle(Request $request, Campus $campus): RedirectResponse
     {
-        Gate::authorize('update', $campus);
+        Gate::authorize('toggleVisibility', $campus);
 
         $validated = $request->validate([
             'is_active' => ['required', 'boolean'],

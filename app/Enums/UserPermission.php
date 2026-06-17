@@ -16,6 +16,7 @@ enum UserPermission: string
 
     case ManageProgram = 'program:manage';
     case ManageCampus = 'campus:manage';
+    case ToggleCampusVisibility = 'campus:toggle-visibility';
 
     public function label(): string
     {
@@ -30,6 +31,7 @@ enum UserPermission: string
             self::CreateInquiryStream => 'Add inquiry streams',
             self::ManageProgram => 'Manage programs',
             self::ManageCampus => 'Manage campuses',
+            self::ToggleCampusVisibility => 'Toggle campus visibility',
         };
     }
 }

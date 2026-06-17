@@ -34,12 +34,14 @@ enum UserRole: string
                 UserPermission::CreateInquiryStream,
                 UserPermission::ManageProgram,
                 UserPermission::ManageCampus,
+                UserPermission::ToggleCampusVisibility,
             ],
             self::User => [
                 UserPermission::ViewInquiry,
                 UserPermission::CreateInquiry,
                 UserPermission::UpdateAssignedInquiry,
                 UserPermission::CreateInquiryStream,
+                UserPermission::ToggleCampusVisibility,
             ],
         };
     }

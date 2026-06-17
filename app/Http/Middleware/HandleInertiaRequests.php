@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Enums\UserPermission;
 use App\Models\Campus;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -53,7 +54,7 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error' => fn () => $request->session()->get('error'),
             ],
-            'campusVisibility' => $user?->can('viewAny', Campus::class)
+            'campusVisibility' => $user?->hasPermission(UserPermission::ToggleCampusVisibility)
                 ? Campus::query()
                     ->orderBy('name')
                     ->get(['id', 'name', 'is_active'])

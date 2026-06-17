@@ -37,6 +37,9 @@ export function AppSidebar() {
     const canViewInquiries = permissions.includes('inquiry:view');
     const canManagePrograms = permissions.includes('program:manage');
     const canManageCampuses = permissions.includes('campus:manage');
+    const canToggleCampusVisibility = permissions.includes(
+        'campus:toggle-visibility',
+    );
     const canManageUsers = permissions.includes('users:manage');
 
     const mainNavItems: NavItem[] = [
@@ -91,7 +94,7 @@ export function AppSidebar() {
                         </SidebarMenuButton>
                     </SidebarMenuItem>
                 </SidebarMenu>
-                {canManageCampuses && (
+                {canToggleCampusVisibility && (
                     <CampusVisibility campuses={campusVisibility} />
                 )}
             </SidebarHeader>

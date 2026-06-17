@@ -48,9 +48,26 @@ class DashboardTest extends TestCase
                 ->where('campusVisibility.0.is_active', true));
     }
 
-    public function test_restricted_users_do_not_receive_campus_controls(): void
+    public function test_role_users_receive_sidebar_visibility_controls(): void
     {
         $user = User::factory()->create(['role' => UserRole::User]);
+        $campus = Campus::factory()->create(['is_active' => true]);
+
+        $this->actingAs($user)
+            ->get(route('dashboard'))
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('campusVisibility', 1)
+                ->where('campusVisibility.0.id', $campus->id)
+                ->where('campusVisibility.0.name', $campus->name)
+                ->where('campusVisibility.0.is_active', true));
+    }
+
+    public function test_custom_restricted_users_do_not_receive_campus_controls(): void
+    {
+        $user = User::factory()->create([
+            'role' => UserRole::User,
+            'permissions' => ['inquiry:view'],
+        ]);
         Campus::factory()->create();
 
         $this->actingAs($user)
