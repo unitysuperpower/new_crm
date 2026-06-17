@@ -280,8 +280,20 @@ foreach ($newUsers as $user) {
 }
 $superAdminId ??= 101;
 
-$userMap = [];
+$forcedUserMap = [
+    // Old CRM user IDs to new CRM user IDs.
+    // Hira was user 2 in the old CRM and is user 103 in the new CRM.
+    // Suraiya was user 3 in the old CRM and is user 104 in the new CRM.
+    2 => 103,
+    3 => 104,
+];
+
+$userMap = $forcedUserMap;
 foreach ($oldUsers as $user) {
+    if (isset($forcedUserMap[(int) $user['id']])) {
+        continue;
+    }
+
     $email = strtolower((string) $user['email']);
 
     if (isset($newUsersByEmail[$email])) {
