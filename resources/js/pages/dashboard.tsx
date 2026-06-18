@@ -2543,6 +2543,7 @@ function PaginationControls({
         from: number | null;
         last_page: number;
         next_page_url: string | null;
+        per_page: number;
         prev_page_url: string | null;
         to: number | null;
         total: number;
@@ -2559,6 +2560,17 @@ function PaginationControls({
         });
     };
 
+    const changePerPage = (perPage: string) => {
+        const url = new URL(window.location.href);
+        url.searchParams.set('per_page', perPage);
+        url.searchParams.delete('page');
+
+        router.visit(`${url.pathname}?${url.searchParams.toString()}`, {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    };
+
     return (
         <div className="flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between">
             <div className="text-sm text-muted-foreground">
@@ -2566,7 +2578,22 @@ function PaginationControls({
                     ? `Showing ${pagination.from} to ${pagination.to} of ${pagination.total} inquiries`
                     : 'No inquiries to show'}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+                <Select
+                    value={String(pagination.per_page)}
+                    onValueChange={changePerPage}
+                >
+                    <SelectTrigger className="h-9 w-[132px]">
+                        <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {[10, 25, 50, 100].map((limit) => (
+                            <SelectItem key={limit} value={String(limit)}>
+                                {limit} / page
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
                 <Button
                     type="button"
                     variant="outline"

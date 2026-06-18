@@ -47,6 +47,7 @@ class InquiryController extends Controller
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'queue' => ['nullable', Rule::in(['all', 'assigned_today', 'yesterday', 'today', 'next_3_days'])],
+            'per_page' => ['nullable', 'integer', Rule::in([10, 25, 50, 100])],
         ]);
 
         $isInquiryPage = $request->routeIs('inquiries.index');
@@ -83,7 +84,8 @@ class InquiryController extends Controller
             default => $query->latest('created_at'),
         };
 
-        $paginatedInquiries = $query->paginate(10)->withQueryString();
+        $perPage = (int) ($filters['per_page'] ?? 10);
+        $paginatedInquiries = $query->paginate($perPage)->withQueryString();
         $inquiries = $paginatedInquiries->getCollection()
             ->map(fn (Inquiry $inquiry) => $this->serializeInquiry($inquiry, $request->user()))
             ->values();
@@ -102,6 +104,7 @@ class InquiryController extends Controller
                 'date_from' => $filters['date_from'] ?? '',
                 'date_to' => $filters['date_to'] ?? '',
                 'queue' => $queue,
+                'per_page' => (string) $perPage,
             ],
             'inquiries' => $inquiries,
             'pagination' => [
