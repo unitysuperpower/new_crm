@@ -1171,6 +1171,8 @@ export default function Dashboard({
                         </div>
                     )}
 
+                    <TableDisplayControls pagination={pagination} />
+
                     <div className="relative overflow-x-auto">
                         <table className="w-full min-w-[1180px] text-sm">
                             <thead className="sticky top-0 z-10 bg-muted text-muted-foreground shadow-[inset_0_-1px_0_var(--border)]">
@@ -2662,6 +2664,51 @@ function PaginationControls({
         });
     };
 
+    return (
+        <div className="flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between">
+            <div className="text-sm text-muted-foreground">
+                Page {pagination.current_page} of {pagination.last_page}
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!pagination.prev_page_url}
+                    onClick={() => visitPage(pagination.prev_page_url)}
+                >
+                    <ChevronLeft />
+                    Previous
+                </Button>
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!pagination.next_page_url}
+                    onClick={() => visitPage(pagination.next_page_url)}
+                >
+                    Next
+                    <ChevronRight />
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+function TableDisplayControls({
+    pagination,
+}: {
+    pagination: {
+        current_page: number;
+        from: number | null;
+        last_page: number;
+        next_page_url: string | null;
+        per_page: number;
+        prev_page_url: string | null;
+        to: number | null;
+        total: number;
+    };
+}) {
     const changePerPage = (perPage: string) => {
         const url = new URL(window.location.href);
         url.searchParams.set('per_page', perPage);
@@ -2674,21 +2721,17 @@ function PaginationControls({
     };
 
     return (
-        <div className="flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between">
-            <div className="text-sm text-muted-foreground">
-                {pagination.total > 0
-                    ? `Showing ${pagination.from} to ${pagination.to} of ${pagination.total} inquiries`
-                    : 'No inquiries to show'}
-            </div>
+        <div className="flex flex-col gap-3 border-t bg-muted/10 p-4 md:flex-row md:items-center md:justify-between">
             <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium">Rows</span>
                 <Select
                     value={String(pagination.per_page)}
                     onValueChange={changePerPage}
                 >
-                    <SelectTrigger className="h-9 w-[132px]">
+                    <SelectTrigger className="h-9 w-[132px] bg-background">
                         <SelectValue />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent align="start">
                         {[10, 25, 50, 100].map((limit) => (
                             <SelectItem key={limit} value={String(limit)}>
                                 {limit} / page
@@ -2696,29 +2739,11 @@ function PaginationControls({
                         ))}
                     </SelectContent>
                 </Select>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!pagination.prev_page_url}
-                    onClick={() => visitPage(pagination.prev_page_url)}
-                >
-                    <ChevronLeft />
-                    Previous
-                </Button>
-                <span className="px-2 text-sm text-muted-foreground">
-                    Page {pagination.current_page} of {pagination.last_page}
-                </span>
-                <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={!pagination.next_page_url}
-                    onClick={() => visitPage(pagination.next_page_url)}
-                >
-                    Next
-                    <ChevronRight />
-                </Button>
+            </div>
+            <div className="text-sm text-muted-foreground md:text-right">
+                {pagination.total > 0
+                    ? `Showing ${pagination.from} to ${pagination.to} of ${pagination.total} inquiries`
+                    : 'No inquiries to show'}
             </div>
         </div>
     );
