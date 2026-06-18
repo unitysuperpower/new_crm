@@ -4,52 +4,42 @@
     <meta charset="utf-8">
     <title>Assigned Inquiries Report</title>
     <style>
-        @page { margin: 34px 38px 42px; }
-        body { color: #17202a; font-family: "DejaVu Sans", sans-serif; font-size: 9px; line-height: 1.45; }
-        .header { border-bottom: 2px solid #9b1c31; margin-bottom: 18px; padding-bottom: 12px; }
-        .header-table { border-collapse: collapse; width: 100%; }
-        .header-table td { border: 0; padding: 0; vertical-align: bottom; }
-        .logo { height: 50px; margin-bottom: 5px; }
-        .brand { color: #9b1c31; font-size: 18px; font-weight: bold; }
-        .subtitle { color: #667085; font-size: 8px; letter-spacing: 0.5px; text-transform: uppercase; }
-        .generated { color: #667085; text-align: right; }
-        h1 { font-size: 16px; margin: 0 0 14px; text-align: center; text-transform: uppercase; }
-        .filters { background: #f4f6f8; border: 1px solid #d0d5dd; margin-bottom: 13px; padding: 8px 10px; }
+        @page { margin: 28px 34px 42px; }
+        body { color: #151719; font-family: "DejaVu Sans", sans-serif; font-size: 9px; line-height: 1.45; }
+        .header { background: #050505; border-radius: 8px; color: #ffffff; margin-bottom: 18px; padding: 18px 20px 16px; text-align: center; }
+        .logo { display: block; height: 62px; margin: 0 auto 8px; }
+        .brand { color: #d7b75a; font-size: 24px; font-weight: bold; letter-spacing: 1px; line-height: 1; text-align: center; text-transform: uppercase; }
+        .subtitle { color: #d7dbe0; font-size: 8px; letter-spacing: 1.1px; margin-top: 5px; text-align: center; text-transform: uppercase; }
+        .generated { color: #b8bec6; font-size: 8px; margin-top: 10px; text-align: center; }
+        h1 { color: #151719; font-size: 15px; letter-spacing: 0.4px; margin: 0 0 14px; text-align: center; text-transform: uppercase; }
+        .filters { background: #f4f5f7; border: 1px solid #d7dce2; border-radius: 6px; margin-bottom: 13px; padding: 9px 10px; text-align: center; }
         .filter-table { border-collapse: collapse; width: 100%; }
-        .filter-table td { border: 0; padding: 2px 8px 2px 0; }
+        .filter-table td { border: 0; padding: 3px 7px; text-align: center; vertical-align: top; }
         .filter-label { color: #667085; font-size: 8px; text-transform: uppercase; }
-        .summary { margin: 0 0 13px; }
-        .count { border: 1px solid #d0d5dd; display: inline-block; margin: 0 5px 5px 0; min-width: 62px; padding: 6px 8px; }
-        .count strong { color: #9b1c31; font-size: 13px; }
+        .summary { margin: 0 0 13px; text-align: center; }
+        .count { background: #ffffff; border: 1px solid #d0d5dd; border-radius: 5px; display: inline-block; margin: 0 4px 6px; min-width: 68px; padding: 7px 9px; text-align: center; }
+        .count strong { color: #0d0f12; font-size: 14px; }
         .report-table { border-collapse: collapse; table-layout: fixed; width: 100%; }
         .report-table thead { display: table-header-group; }
         .report-table tr { page-break-inside: avoid; }
-        .report-table th { background: #9b1c31; color: #fff; font-size: 8px; font-weight: bold; text-align: left; text-transform: uppercase; }
-        .report-table th, .report-table td { border: 1px solid #cfd5dc; padding: 6px; vertical-align: top; word-wrap: break-word; }
+        .report-table th { background: #050505; color: #fff; font-size: 8px; font-weight: bold; text-align: center; text-transform: uppercase; }
+        .report-table th, .report-table td { border: 1px solid #cfd5dc; padding: 6px; text-align: center; vertical-align: middle; word-wrap: break-word; }
         .report-table tbody tr:nth-child(even) { background: #f7f8fa; }
         .student { font-weight: bold; }
         .muted { color: #667085; }
         .empty { padding: 22px !important; text-align: center; }
-        .note { color: #667085; font-size: 8px; margin-top: 12px; }
+        .note { color: #667085; font-size: 8px; margin-top: 12px; text-align: center; }
         .footer { bottom: -25px; color: #667085; font-size: 8px; left: 0; position: fixed; right: 0; text-align: center; }
     </style>
 </head>
 <body>
     <div class="header">
-        <table class="header-table">
-            <tr>
-                <td>
-                    @if ($logoData)
-                        <img class="logo" src="{{ $logoData }}" alt="Aurea Education">
-                    @endif
-                    <div class="brand">Aurea Education</div>
-                    <div class="subtitle">Academic Admissions and Student Services</div>
-                </td>
-                <td class="generated">
-                    <strong>Generated</strong><br>{{ $generatedAt }}
-                </td>
-            </tr>
-        </table>
+        @if ($logoData)
+            <img class="logo" src="{{ $logoData }}" alt="Aurea Education">
+        @endif
+        <div class="brand">AUREA EDUCATION</div>
+        <div class="subtitle">Academic Admissions and Student Services</div>
+        <div class="generated"><strong>Generated:</strong> {{ $generatedAt }}</div>
     </div>
 
     <h1>Assigned Inquiries Report</h1>
