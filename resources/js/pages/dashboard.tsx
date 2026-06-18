@@ -48,6 +48,10 @@ import { showErrorToast } from '@/hooks/use-flash-toast';
 
 // Types and utils
 type Option = { id: number; name: string };
+type ProgramOption = Option & {
+    campus_id: number | null;
+    duration: string | null;
+};
 type TeamMember = Option & { department: string };
 type CampusOption = Option & { is_active: boolean };
 type Stream = {
@@ -67,7 +71,7 @@ type Inquiry = {
     address: string | null;
     source: string | null;
     program_id: number | null;
-    program: Option | null;
+    program: ProgramOption | null;
     previous_program: string | null;
     campus_id: number | null;
     campus_model: Option | null;
@@ -95,6 +99,8 @@ type InquiryForm = {
     address: string;
     source: string;
     program_id: string;
+    program: string;
+    program_duration: string;
     previous_program: string;
     campus_id: string;
     campus: string;
@@ -170,6 +176,8 @@ const emptyInquiry: InquiryForm = {
     address: '',
     source: '',
     program_id: '',
+    program: '',
+    program_duration: '',
     previous_program: '',
     campus_id: '',
     campus: '',
@@ -226,7 +234,7 @@ export default function Dashboard({
     };
 
     // The programs, campuses, teamMembers, sourceOptions, statusOptions, and departmentOptions props represent the available options for filtering and managing inquiries in the dashboard. They are used to populate dropdowns and selection components in the UI, allowing users to filter inquiries by program, campus, assigned user, source, status, and department. The filterCounts prop provides the counts of inquiries for each filter category, which can be displayed alongside the filter options to give users insight into how many inquiries match each filter value. The queueCounts prop provides counts of inquiries in different follow-up queues, which can be displayed in the dashboard header to give users an overview of their workload and upcoming follow-ups. The crmPermissions prop indicates the user's permissions for managing inquiries, which can be used to conditionally render UI elements and actions based on what the user is allowed to do.
-    programs: Option[];
+    programs: ProgramOption[];
     campuses: CampusOption[];
     teamMembers: TeamMember[];
     sourceOptions: string[];
@@ -460,7 +468,7 @@ export default function Dashboard({
             '/inquiries/import',
             {
                 csv_file: importFile,
-                rows: importRows.map(normalizeInquiry),
+                rows: importRows.map((row) => normalizeInquiry(row, true)),
             },
             {
                 forceFormData: true,
@@ -1661,7 +1669,7 @@ export default function Dashboard({
                         </div>
                     )}
                     <div className="relative max-h-[60vh] overflow-auto rounded-md border">
-                        <table className="w-full min-w-[1100px] text-sm">
+                        <table className="w-full min-w-[1180px] text-sm">
                             <thead className="sticky top-0 z-10 bg-muted text-muted-foreground shadow-[inset_0_-1px_0_var(--border)]">
                                 <tr>
                                     {[
@@ -1670,6 +1678,7 @@ export default function Dashboard({
                                         'Email',
                                         'Source',
                                         'Program',
+                                        'Duration',
                                         'Previous program',
                                         'Campus',
                                         'Status',
@@ -1696,9 +1705,10 @@ export default function Dashboard({
                                                     (program) =>
                                                         String(program.id) ===
                                                         row.program_id,
-                                                )?.name
+                                                )?.name ?? row.program
                                             }
                                         </Td>
+                                        <Td>{row.program_duration}</Td>
                                         <Td>{row.previous_program}</Td>
                                         <Td>
                                             {activeCampuses.find(
@@ -2096,7 +2106,7 @@ function InquiryFormFields({
     onSubmit,
 }: {
     form: InquiryForm;
-    programs: Option[];
+    programs: ProgramOption[];
     campuses: Option[];
     teamMembers: TeamMember[];
     statusOptions: string[];
@@ -2106,6 +2116,8 @@ function InquiryFormFields({
     onChange: (form: InquiryForm) => void;
     onSubmit: (event: FormEvent) => void;
 }) {
+    const visiblePrograms = filterProgramsByCampus(programs, form.campus_id);
+
     return (
         <form className="grid gap-4" onSubmit={onSubmit}>
             <div className="grid gap-3 md:grid-cols-2">
@@ -2141,9 +2153,11 @@ function InquiryFormFields({
                     label="Program"
                     value={form.program_id}
                     placeholder="No program"
-                    options={programs.map((program) => ({
+                    options={visiblePrograms.map((program) => ({
                         value: String(program.id),
-                        label: program.name,
+                        label: program.duration
+                            ? `${program.name} (${program.duration})`
+                            : program.name,
                     }))}
                     onChange={(program_id) => onChange({ ...form, program_id })}
                 />
@@ -2162,7 +2176,13 @@ function InquiryFormFields({
                         value: String(campus.id),
                         label: campus.name,
                     }))}
-                    onChange={(campus_id) => onChange({ ...form, campus_id })}
+                    onChange={(campus_id) =>
+                        onChange({
+                            ...form,
+                            campus_id,
+                            program_id: campus_id ? '' : form.program_id,
+                        })
+                    }
                 />
                 <SelectField
                     label="Assigned user"
@@ -2242,10 +2262,15 @@ function InquiryDetailsFields({
     onChange,
 }: {
     inquiry: Inquiry;
-    programs: Option[];
+    programs: ProgramOption[];
     campuses: Option[];
     onChange: (inquiry: Inquiry) => void;
 }) {
+    const visiblePrograms = filterProgramsByCampus(
+        programs,
+        String(inquiry.campus_id ?? ''),
+    );
+
     return (
         <div className="space-y-4 rounded-md border p-4">
             <div className="grid gap-3 md:grid-cols-2">
@@ -2288,9 +2313,11 @@ function InquiryDetailsFields({
                     label="Program"
                     value={String(inquiry.program_id ?? '')}
                     placeholder="No program"
-                    options={programs.map((program) => ({
+                    options={visiblePrograms.map((program) => ({
                         value: String(program.id),
-                        label: program.name,
+                        label: program.duration
+                            ? `${program.name} (${program.duration})`
+                            : program.name,
                     }))}
                     onChange={(programId) =>
                         onChange({
@@ -2311,6 +2338,7 @@ function InquiryDetailsFields({
                         onChange({
                             ...inquiry,
                             campus_id: campusId ? Number(campusId) : null,
+                            program_id: campusId ? null : inquiry.program_id,
                         })
                     }
                 />
@@ -2897,14 +2925,21 @@ function cleanPayload(payload: Record<string, string>) {
     );
 }
 
-function normalizeInquiry(row: InquiryForm) {
+function normalizeInquiry(row: InquiryForm, includeCsvProgram = false) {
     return {
-        ...row,
+        name: row.name,
+        phone: row.phone,
         email: row.email || null,
         city: row.city || null,
         address: row.address || null,
         source: row.source || null,
         program_id: row.program_id || null,
+        ...(includeCsvProgram
+            ? {
+                  program: row.program || null,
+                  program_duration: row.program_duration || null,
+              }
+            : {}),
         previous_program: row.previous_program || null,
         campus_id: row.campus_id || null,
         campus: row.campus || null,
@@ -2965,14 +3000,42 @@ function parseCsv(text: string): Record<string, string>[] {
         );
 }
 
+function filterProgramsByCampus(
+    programs: ProgramOption[],
+    campusId: string,
+): ProgramOption[] {
+    if (!campusId) {
+        return programs;
+    }
+
+    return programs.filter(
+        (program) => String(program.campus_id ?? '') === campusId,
+    );
+}
+
 function csvRowToInquiry(
     row: Record<string, string>,
-    programs: Option[],
+    programs: ProgramOption[],
     campuses: Option[],
 ): InquiryForm {
     const programName = row.program ?? row.program_name ?? '';
+    const programDuration = row.program_duration ?? row.duration ?? '';
     const campusName =
         row.campus ?? row.campus_name ?? row.branch ?? row.location ?? '';
+    const campusId =
+        row.campus_id ??
+        String(
+            campuses.find(
+                (campus) =>
+                    campus.name.toLowerCase() === campusName.toLowerCase(),
+            )?.id ?? '',
+        );
+    const matchedProgram = filterProgramsByCampus(programs, campusId).find(
+        (program) =>
+            program.name.toLowerCase() === programName.toLowerCase() ||
+            normalizeProgramName(program.name) ===
+                normalizeProgramName(programName),
+    );
 
     return {
         ...emptyInquiry,
@@ -2982,28 +3045,15 @@ function csvRowToInquiry(
         city: row.city ?? '',
         address: row.address ?? '',
         source: row.source ?? row.lead_source ?? row.inquiry_source ?? '',
-        program_id:
-            row.program_id ??
-            String(
-                programs.find(
-                    (program) =>
-                        program.name.toLowerCase() ===
-                        programName.toLowerCase(),
-                )?.id ?? '',
-            ),
+        program_id: row.program_id ?? String(matchedProgram?.id ?? ''),
+        program: programName,
+        program_duration: programDuration,
         previous_program:
             row.previous_program ??
             row.previous_program_name ??
             row.old_program ??
             '',
-        campus_id:
-            row.campus_id ??
-            String(
-                campuses.find(
-                    (campus) =>
-                        campus.name.toLowerCase() === campusName.toLowerCase(),
-                )?.id ?? '',
-            ),
+        campus_id: campusId,
         campus: campusName,
         status: row.status || 'pending',
         assigned_user_id: '',
@@ -3011,6 +3061,15 @@ function csvRowToInquiry(
         next_follow_up_at: row.next_follow_up_at ?? row.follow_up ?? '',
         message: row.message ?? row.discussion ?? '',
     };
+}
+
+function normalizeProgramName(value: string) {
+    return value
+        .toLowerCase()
+        .replace(/[–—-]/g, ' ')
+        .replace(/[^\p{L}\p{N}]+/gu, ' ')
+        .trim()
+        .replace(/\s+/g, ' ');
 }
 
 Dashboard.layout = (props: { pageTitle?: string; pageUrl?: string }) => ({

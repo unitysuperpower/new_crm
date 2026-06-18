@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreProgramRequest;
 use App\Http\Requests\UpdateProgramRequest;
+use App\Models\Campus;
 use App\Models\Program;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,18 +21,33 @@ class ProgramController extends Controller
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
+            'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
         ]);
 
         $programs = Program::query()
+            ->with('campus:id,name')
             ->withCount('inquiries')
             ->when($filters['search'] ?? null, function ($query, string $search) {
-                $query->where('name', 'like', "%{$search}%")
-                    ->orWhere('duration', 'like', "%{$search}%");
+                $query->where(function ($inner) use ($search): void {
+                    $inner->where('name', 'like', "%{$search}%")
+                        ->orWhere('duration', 'like', "%{$search}%")
+                        ->orWhereHas('campus', fn ($campusQuery) => $campusQuery->where('name', 'like', "%{$search}%"));
+                });
             })
+            ->when($filters['campus_id'] ?? null, fn ($query, int $campusId) => $query->where('campus_id', $campusId))
+            ->orderByRaw('campus_id IS NULL')
+            ->orderBy(
+                Campus::query()
+                    ->select('name')
+                    ->whereColumn('campuses.id', 'programs.campus_id')
+                    ->limit(1),
+            )
             ->orderBy('name')
             ->get()
             ->map(fn (Program $program) => [
                 'id' => $program->id,
+                'campus_id' => $program->campus_id,
+                'campus' => $program->campus?->only(['id', 'name']),
                 'name' => $program->name,
                 'duration' => $program->duration,
                 'fee' => $program->fee,
@@ -43,8 +59,12 @@ class ProgramController extends Controller
         return Inertia::render('programs/index', [
             'filters' => [
                 'search' => $filters['search'] ?? '',
+                'campus_id' => $filters['campus_id'] ?? '',
             ],
             'programs' => $programs,
+            'campuses' => Campus::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'is_active']),
             'metrics' => [
                 'total' => $programs->count(),
                 'withInquiries' => $programs->where('inquiries_count', '>', 0)->count(),

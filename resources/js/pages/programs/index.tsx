@@ -15,9 +15,18 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 
 type Program = {
     id: number;
+    campus_id: number | null;
+    campus: { id: number; name: string } | null;
     name: string;
     duration: string | null;
     fee: string;
@@ -27,12 +36,20 @@ type Program = {
 };
 
 type ProgramForm = {
+    campus_id: string;
     name: string;
     duration: string;
     fee: string;
 };
 
+type CampusOption = {
+    id: number;
+    name: string;
+    is_active: boolean;
+};
+
 const emptyProgram: ProgramForm = {
+    campus_id: '',
     name: '',
     duration: '',
     fee: '',
@@ -41,10 +58,12 @@ const emptyProgram: ProgramForm = {
 export default function ProgramsIndex({
     filters,
     programs,
+    campuses,
     metrics,
 }: {
-    filters: { search: string };
+    filters: { search: string; campus_id: string };
     programs: Program[];
+    campuses: CampusOption[];
     metrics: {
         total: number;
         withInquiries: number;
@@ -52,27 +71,41 @@ export default function ProgramsIndex({
     };
 }) {
     const [search, setSearch] = useState(filters.search ?? '');
+    const [campusId, setCampusId] = useState(filters.campus_id ?? '');
     const [modalOpen, setModalOpen] = useState(false);
     const [editingProgram, setEditingProgram] = useState<Program | null>(null);
     const [form, setForm] = useState<ProgramForm>(emptyProgram);
 
     const submitSearch = (event: FormEvent) => {
         event.preventDefault();
-        router.get('/programs', search ? { search } : {}, {
-            preserveState: true,
-            replace: true,
-        });
+        router.get(
+            '/programs',
+            {
+                ...(search ? { search } : {}),
+                ...(campusId ? { campus_id: campusId } : {}),
+            },
+            {
+                preserveState: true,
+                replace: true,
+            },
+        );
     };
 
     const openCreate = () => {
         setEditingProgram(null);
-        setForm(emptyProgram);
+        setForm({
+            ...emptyProgram,
+            campus_id: String(
+                campuses.find((campus) => campus.is_active)?.id ?? '',
+            ),
+        });
         setModalOpen(true);
     };
 
     const openEdit = (program: Program) => {
         setEditingProgram(program);
         setForm({
+            campus_id: String(program.campus_id ?? ''),
             name: program.name,
             duration: program.duration ?? '',
             fee: program.fee,
@@ -83,6 +116,7 @@ export default function ProgramsIndex({
     const submitProgram = (event: FormEvent) => {
         event.preventDefault();
         const payload = {
+            campus_id: form.campus_id,
             name: form.name,
             duration: form.duration || null,
             fee: form.fee,
@@ -145,25 +179,54 @@ export default function ProgramsIndex({
                 <div className="crm-panel">
                     <div className="flex flex-col gap-3 border-b p-4 md:flex-row md:items-center md:justify-between">
                         <form
-                            className="relative w-full md:max-w-md"
+                            className="flex w-full flex-col gap-2 md:max-w-3xl md:flex-row"
                             onSubmit={submitSearch}
                         >
-                            <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
-                            <Input
-                                className="pl-9"
-                                value={search}
-                                placeholder="Search programs or duration"
-                                onChange={(event) =>
-                                    setSearch(event.target.value)
+                            <div className="relative flex-1">
+                                <Search className="absolute top-2.5 left-3 size-4 text-muted-foreground" />
+                                <Input
+                                    className="pl-9"
+                                    value={search}
+                                    placeholder="Search programs, duration, or campus"
+                                    onChange={(event) =>
+                                        setSearch(event.target.value)
+                                    }
+                                />
+                            </div>
+                            <Select
+                                value={campusId || 'all'}
+                                onValueChange={(value) =>
+                                    setCampusId(value === 'all' ? '' : value)
                                 }
-                            />
+                            >
+                                <SelectTrigger className="w-full md:w-56">
+                                    <SelectValue placeholder="All campuses" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        All campuses
+                                    </SelectItem>
+                                    {campuses.map((campus) => (
+                                        <SelectItem
+                                            key={campus.id}
+                                            value={String(campus.id)}
+                                        >
+                                            {campus.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <Button type="submit" variant="outline">
+                                Filter
+                            </Button>
                         </form>
                     </div>
 
                     <div className="relative overflow-x-auto">
-                        <table className="w-full min-w-[760px] text-sm">
+                        <table className="w-full min-w-[880px] text-sm">
                             <thead className="bg-muted text-muted-foreground">
                                 <tr>
+                                    <Th>Campus</Th>
                                     <Th>Program</Th>
                                     <Th>Duration</Th>
                                     <Th>Fee</Th>
@@ -178,6 +241,12 @@ export default function ProgramsIndex({
                                         key={program.id}
                                         className="crm-table-row"
                                     >
+                                        <Td>
+                                            <Badge variant="outline">
+                                                {program.campus?.name ??
+                                                    'No campus'}
+                                            </Badge>
+                                        </Td>
                                         <Td>
                                             <div className="flex items-center gap-2 font-semibold">
                                                 <span className="flex size-8 items-center justify-center rounded-md bg-primary/10 text-primary">
@@ -238,7 +307,7 @@ export default function ProgramsIndex({
                                     <tr>
                                         <td
                                             className="p-8 text-center text-muted-foreground"
-                                            colSpan={6}
+                                            colSpan={7}
                                         >
                                             <div className="font-medium text-foreground">
                                                 No programs found
@@ -268,6 +337,31 @@ export default function ProgramsIndex({
                         </DialogDescription>
                     </DialogHeader>
                     <form className="space-y-4" onSubmit={submitProgram}>
+                        <div className="grid gap-2">
+                            <Label>Campus</Label>
+                            <Select
+                                value={form.campus_id}
+                                onValueChange={(campus_id) =>
+                                    setForm({ ...form, campus_id })
+                                }
+                            >
+                                <SelectTrigger className="w-full">
+                                    <SelectValue placeholder="Select campus" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {campuses
+                                        .filter((campus) => campus.is_active)
+                                        .map((campus) => (
+                                            <SelectItem
+                                                key={campus.id}
+                                                value={String(campus.id)}
+                                            >
+                                                {campus.name}
+                                            </SelectItem>
+                                        ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <Field
                             label="Program name"
                             value={form.name}

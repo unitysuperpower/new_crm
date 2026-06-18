@@ -30,4 +30,9 @@ class Campus extends Model
     {
         return $this->hasMany(Inquiry::class);
     }
+
+    public function programs(): HasMany
+    {
+        return $this->hasMany(Program::class);
+    }
 }

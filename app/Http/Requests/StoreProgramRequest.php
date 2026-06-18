@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Program;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreProgramRequest extends FormRequest
 {
@@ -24,7 +25,13 @@ class StoreProgramRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255', 'unique:programs,name'],
+            'campus_id' => ['required', Rule::exists('campuses', 'id')->where('is_active', true)],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+                Rule::unique('programs', 'name')->where(fn ($query) => $query->where('campus_id', $this->input('campus_id'))),
+            ],
             'duration' => ['nullable', 'string', 'max:255'],
             'fee' => ['required', 'numeric', 'min:0', 'max:999999.99'],
         ];

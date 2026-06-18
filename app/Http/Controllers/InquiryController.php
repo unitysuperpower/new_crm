@@ -53,7 +53,7 @@ class InquiryController extends Controller
         $queue = $filters['queue'] ?? 'all';
 
         $query = $this->workspaceQuery($request, $isInquiryPage, $queue)
-            ->with(['program:id,name', 'campusModel:id,name', 'assignedUser:id,name', 'streams.user:id,name'])
+            ->with(['program:id,name,campus_id,duration', 'campusModel:id,name', 'assignedUser:id,name', 'streams.user:id,name'])
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $query->where(function ($inner) use ($search) {
                     $inner->where('name', 'like', "%{$search}%")
@@ -114,7 +114,17 @@ class InquiryController extends Controller
                 'to' => $paginatedInquiries->lastItem(),
                 'total' => $paginatedInquiries->total(),
             ],
-            'programs' => Program::query()->orderBy('name')->get(['id', 'name']),
+            'programs' => Program::query()
+                ->with('campus:id,name')
+                ->orderBy('name')
+                ->get(['id', 'campus_id', 'name', 'duration'])
+                ->map(fn (Program $program) => [
+                    'id' => $program->id,
+                    'campus_id' => $program->campus_id,
+                    'name' => $program->name,
+                    'duration' => $program->duration,
+                    'campus' => $program->campus?->only(['id', 'name']),
+                ]),
             'campuses' => Campus::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'is_active']),
@@ -217,7 +227,7 @@ class InquiryController extends Controller
         Gate::authorize('view', $inquiry);
         abort_unless($inquiry->postal_communication === 'send', 404);
 
-        $inquiry->loadMissing(['program:id,name', 'campusModel:id,name']);
+        $inquiry->loadMissing(['program:id,name,campus_id,duration', 'campusModel:id,name']);
         $logoPath = public_path('logo.jpeg');
         $logoData = file_exists($logoPath)
             ? 'data:image/jpeg;base64,'.base64_encode(file_get_contents($logoPath))
@@ -259,6 +269,10 @@ class InquiryController extends Controller
             'rows.*.address' => ['nullable', 'string', 'max:2000'],
             'rows.*.source' => ['nullable', 'string', 'max:255'],
             'rows.*.program_id' => ['nullable', 'exists:programs,id'],
+            'rows.*.program' => ['nullable', 'string', 'max:255'],
+            'rows.*.program_name' => ['nullable', 'string', 'max:255'],
+            'rows.*.program_duration' => ['nullable', 'string', 'max:255'],
+            'rows.*.duration' => ['nullable', 'string', 'max:255'],
             'rows.*.previous_program' => ['nullable', 'string', 'max:255'],
             'rows.*.campus' => ['nullable', 'string', 'max:255'],
             'rows.*.campus_id' => [
@@ -320,6 +334,15 @@ class InquiryController extends Controller
                             ->value('id');
                     }
 
+                    $row['program_id'] = $this->resolveImportProgramId($row);
+
+                    unset(
+                        $row['program'],
+                        $row['program_name'],
+                        $row['program_duration'],
+                        $row['duration'],
+                    );
+
                     Inquiry::create($row);
                 }
             });
@@ -342,6 +365,52 @@ class InquiryController extends Controller
         }
 
         return back()->with('success', $message);
+    }
+
+    private function resolveImportProgramId(array $row): ?int
+    {
+        $duration = trim((string) ($row['program_duration'] ?? $row['duration'] ?? ''));
+
+        if (! empty($row['program_id'])) {
+            $program = Program::find($row['program_id']);
+
+            if ($program && $duration !== '' && blank($program->duration)) {
+                $program->update(['duration' => $duration]);
+            }
+
+            return $program?->id;
+        }
+
+        $programName = trim((string) ($row['program'] ?? $row['program_name'] ?? ''));
+
+        if ($programName === '') {
+            return null;
+        }
+
+        $campusId = $row['campus_id'] ?? null;
+        $query = Program::query()
+            ->whereRaw('LOWER(name) = ?', [mb_strtolower($programName)]);
+
+        if ($campusId) {
+            $query->where('campus_id', $campusId);
+        }
+
+        $program = $query->first();
+
+        if (! $program && $campusId) {
+            $program = Program::create([
+                'campus_id' => $campusId,
+                'name' => $programName,
+                'duration' => $duration !== '' ? $duration : null,
+                'fee' => 0,
+            ]);
+        }
+
+        if ($program && $duration !== '' && blank($program->duration)) {
+            $program->update(['duration' => $duration]);
+        }
+
+        return $program?->id;
     }
 
     private function storeInquiryImportFile(Request $request): ?string
@@ -389,7 +458,7 @@ class InquiryController extends Controller
         $search = $validated['query'];
 
         $results = $this->visibleInquiryQuery($request, $isAssigned)
-            ->with(['program:id,name', 'campusModel:id,name', 'assignedUser:id,name', 'streams.user:id,name'])
+            ->with(['program:id,name,campus_id,duration', 'campusModel:id,name', 'assignedUser:id,name', 'streams.user:id,name'])
             ->where(function (Builder $query) use ($search): void {
                 $query->where('name', 'like', "%{$search}%")
                     ->orWhere('phone', 'like', "%{$search}%")
@@ -493,7 +562,7 @@ class InquiryController extends Controller
             'address' => $inquiry->address,
             'source' => $inquiry->source,
             'program_id' => $inquiry->program_id,
-            'program' => $inquiry->program?->only(['id', 'name']),
+            'program' => $inquiry->program?->only(['id', 'name', 'campus_id', 'duration']),
             'previous_program' => $inquiry->previous_program,
             'campus_id' => $inquiry->campus_id,
             'campus_model' => $inquiry->campusModel?->only(['id', 'name']),
@@ -637,7 +706,7 @@ class InquiryController extends Controller
         $canSelectUser = $request->user()->can('assign', Inquiry::class);
 
         return Inquiry::query()
-            ->with(['program:id,name', 'campusModel:id,name', 'assignedUser:id,name'])
+            ->with(['program:id,name,campus_id,duration', 'campusModel:id,name', 'assignedUser:id,name'])
             ->whereNotNull('assigned_user_id')
             ->where(function (Builder $query) {
                 $query->whereNull('campus_id')

@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\ProgramFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Program extends Model
@@ -13,6 +14,7 @@ class Program extends Model
     use HasFactory;
 
     protected $fillable = [
+        'campus_id',
         'name',
         'duration',
         'fee',
@@ -28,5 +30,10 @@ class Program extends Model
     public function inquiries(): HasMany
     {
         return $this->hasMany(Inquiry::class);
+    }
+
+    public function campus(): BelongsTo
+    {
+        return $this->belongsTo(Campus::class);
     }
 }
