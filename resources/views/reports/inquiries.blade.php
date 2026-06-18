@@ -58,6 +58,7 @@
         <table class="filter-table">
             <tr>
                 <td><span class="filter-label">Campus</span><br><strong>{{ $filters['campus'] ?? 'All campuses' }}</strong></td>
+                <td><span class="filter-label">Program</span><br><strong>{{ $filters['program'] ?? 'All programs' }}</strong></td>
                 <td><span class="filter-label">Status</span><br><strong>{{ $filters['status'] ? ucfirst($filters['status']) : 'All statuses' }}</strong></td>
                 <td><span class="filter-label">Assigned user</span><br><strong>{{ $filters['user'] ?? 'All permitted users' }}</strong></td>
                 <td><span class="filter-label">Updated date range</span><br><strong>{{ $filters['dateFrom'] ?? 'Any date' }} to {{ $filters['dateTo'] ?? 'Any date' }}</strong></td>

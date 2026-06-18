@@ -114,6 +114,7 @@ type InquiryForm = {
 // The report filters type represents the structure of the filters that can be applied when generating an inquiry report. It includes fields for filtering by campus, status, assigned user, and date range.
 type ReportFilters = {
     campus_id: string;
+    program_id: string;
     status: string;
     assigned_user_id: string;
     date_from: string;
@@ -139,6 +140,7 @@ type InquiryReport = {
     generatedAt: string;
     filters: {
         campus: string | null;
+        program: string | null;
         status: string | null;
         user: string | null;
         dateFrom: string | null;
@@ -154,6 +156,7 @@ type FilterCounts = {
     status: Record<string, number>;
     department: Record<string, number>;
     source: Record<string, number>;
+    program: Record<string, number>;
     campus: Record<string, number>;
     assigned_user: Record<string, number>;
 };
@@ -191,6 +194,7 @@ const emptyInquiry: InquiryForm = {
 // The empty report filters constant represents the initial state of the report filters when generating a new inquiry report. It includes default values for all the fields in the ReportFilters type, which can be used to reset the filters after generating a report or when opening the report filter dialog.
 const emptyReportFilters: ReportFilters = {
     campus_id: '',
+    program_id: '',
     status: '',
     assigned_user_id: '',
     date_from: '',
@@ -299,6 +303,14 @@ export default function Dashboard({
     const activeCampuses = useMemo(
         () => campuses.filter((campus) => campus.is_active),
         [campuses],
+    );
+    const tableFilterPrograms = useMemo(
+        () => filterProgramsByCampus(programs, filterForm.campus_id ?? ''),
+        [filterForm.campus_id, programs],
+    );
+    const reportFilterPrograms = useMemo(
+        () => filterProgramsByCampus(programs, reportFilters.campus_id),
+        [programs, reportFilters.campus_id],
     );
 
     // The selectedUserTabs variable is a memoized value that computes the list of users who have interacted with the currently selected inquiry through its streams. It iterates over the streams of the selected inquiry, counts the number of interactions for each user, and returns an array of user objects with their ID, name, and interaction count. This is used to display tabs or sections in the inquiry detail view for each user who has participated in the discussion, allowing users to easily navigate through the conversation history with different team members.
@@ -947,7 +959,7 @@ export default function Dashboard({
                                 </div>
                             </div>
 
-                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1.1fr_1fr_1fr_0.9fr_0.9fr_auto]">
+                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
                                 <FilterSelect
                                     placeholder="Status"
                                     value={filterForm.status ?? ''}
@@ -1016,12 +1028,44 @@ export default function Dashboard({
                                     }
                                 />
                                 <Select
+                                    value={filterForm.program_id || 'all'}
+                                    onValueChange={(value) =>
+                                        setFilterForm({
+                                            ...filterForm,
+                                            program_id:
+                                                value === 'all' ? '' : value,
+                                        })
+                                    }
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="Program" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All programs
+                                        </SelectItem>
+                                        {tableFilterPrograms.map((program) => (
+                                            <SelectItem
+                                                key={program.id}
+                                                value={String(program.id)}
+                                            >
+                                                {program.name} (
+                                                {filterCounts.program[
+                                                    String(program.id)
+                                                ] ?? 0}
+                                                )
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <Select
                                     value={filterForm.campus_id || 'all'}
                                     onValueChange={(value) =>
                                         setFilterForm({
                                             ...filterForm,
                                             campus_id:
                                                 value === 'all' ? '' : value,
+                                            program_id: '',
                                         })
                                     }
                                 >
@@ -1364,6 +1408,7 @@ export default function Dashboard({
                                             ...reportFilters,
                                             campus_id:
                                                 value === 'all' ? '' : value,
+                                            program_id: '',
                                         })
                                     }
                                 >
@@ -1380,6 +1425,35 @@ export default function Dashboard({
                                                 value={String(campus.id)}
                                             >
                                                 {campus.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </ReportField>
+                            <ReportField label="Program">
+                                <Select
+                                    value={reportFilters.program_id || 'all'}
+                                    onValueChange={(value) =>
+                                        setReportFilters({
+                                            ...reportFilters,
+                                            program_id:
+                                                value === 'all' ? '' : value,
+                                        })
+                                    }
+                                >
+                                    <SelectTrigger className="w-full">
+                                        <SelectValue placeholder="All programs" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">
+                                            All programs
+                                        </SelectItem>
+                                        {reportFilterPrograms.map((program) => (
+                                            <SelectItem
+                                                key={program.id}
+                                                value={String(program.id)}
+                                            >
+                                                {program.name}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
@@ -1535,6 +1609,9 @@ export default function Dashboard({
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
                                 <span>
                                     Campus: {report.filters.campus ?? 'All'}
+                                </span>
+                                <span>
+                                    Program: {report.filters.program ?? 'All'}
                                 </span>
                                 <span>
                                     Status: {report.filters.status ?? 'All'}

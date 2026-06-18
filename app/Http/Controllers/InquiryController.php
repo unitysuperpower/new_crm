@@ -39,6 +39,7 @@ class InquiryController extends Controller
             'department' => ['nullable', Rule::in(InquiryOptions::DEPARTMENTS)],
             'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'source' => ['nullable', 'string', 'max:255'],
+            'program_id' => ['nullable', 'integer', 'exists:programs,id'],
             'campus_id' => [
                 'nullable',
                 'integer',
@@ -74,6 +75,7 @@ class InquiryController extends Controller
                 fn ($query) => $query->where('assigned_user_id', $filters['assigned_user_id']),
             )
             ->when($filters['source'] ?? null, fn ($query, string $source) => $query->where('source', $source))
+            ->when($filters['program_id'] ?? null, fn ($query, int $programId) => $query->where('program_id', $programId))
             ->when($filters['campus_id'] ?? null, fn ($query, int $campusId) => $query->where('campus_id', $campusId))
             ->when($filters['date_from'] ?? null, fn ($query, string $dateFrom) => $query->whereDate('created_at', '>=', $dateFrom))
             ->when($filters['date_to'] ?? null, fn ($query, string $dateTo) => $query->whereDate('created_at', '<=', $dateTo));
@@ -100,6 +102,7 @@ class InquiryController extends Controller
                 'department' => $filters['department'] ?? '',
                 'assigned_user_id' => $isInquiryPage ? '' : ($filters['assigned_user_id'] ?? ''),
                 'source' => $filters['source'] ?? '',
+                'program_id' => $filters['program_id'] ?? '',
                 'campus_id' => $filters['campus_id'] ?? '',
                 'date_from' => $filters['date_from'] ?? '',
                 'date_to' => $filters['date_to'] ?? '',
@@ -656,6 +659,7 @@ class InquiryController extends Controller
             'status' => $grouped(clone $base, 'status'),
             'department' => $grouped(clone $base, 'department'),
             'source' => $grouped(clone $base, 'source'),
+            'program' => $grouped(clone $base, 'program_id'),
             'campus' => $grouped(clone $base, 'campus_id'),
             'assigned_user' => $assignedOnly
                 ? []
@@ -696,6 +700,7 @@ class InquiryController extends Controller
     {
         return $request->validate([
             'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
+            'program_id' => ['nullable', 'integer', 'exists:programs,id'],
             'status' => ['nullable', Rule::in(InquiryOptions::STATUSES)],
             'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'date_from' => ['nullable', 'date'],
@@ -724,6 +729,7 @@ class InquiryController extends Controller
                 fn (Builder $query) => $query->where('assigned_user_id', $request->user()->id),
             )
             ->when($filters['campus_id'] ?? null, fn (Builder $query, int $campusId) => $query->where('campus_id', $campusId))
+            ->when($filters['program_id'] ?? null, fn (Builder $query, int $programId) => $query->where('program_id', $programId))
             ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
             ->when($filters['date_from'] ?? null, fn (Builder $query, string $date) => $query->whereDate('updated_at', '>=', $date))
             ->when($filters['date_to'] ?? null, fn (Builder $query, string $date) => $query->whereDate('updated_at', '<=', $date))
@@ -737,6 +743,7 @@ class InquiryController extends Controller
             'generatedAt' => now()->format('M d, Y h:i A'),
             'filters' => [
                 'campus' => isset($filters['campus_id']) ? Campus::find($filters['campus_id'])?->name : null,
+                'program' => isset($filters['program_id']) ? Program::find($filters['program_id'])?->name : null,
                 'status' => $filters['status'] ?? null,
                 'user' => isset($filters['assigned_user_id']) ? User::find($filters['assigned_user_id'])?->name : null,
                 'dateFrom' => $filters['date_from'] ?? null,
