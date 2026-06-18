@@ -2943,7 +2943,9 @@ function normalizeInquiry(row: InquiryForm, includeCsvProgram = false) {
         previous_program: row.previous_program || null,
         campus_id: row.campus_id || null,
         campus: row.campus || null,
+        status: row.status,
         assigned_user_id: row.assigned_user_id || null,
+        department: row.department,
         next_follow_up_at: row.next_follow_up_at || null,
         message: row.message || null,
     };
