@@ -1785,6 +1785,19 @@ export default function Dashboard({
                                             </p>
                                         )}
 
+                                        <InquiryWorkflowFields
+                                            inquiry={selected}
+                                            canEdit={selected.can_update}
+                                            statusOptions={statusOptions}
+                                            departmentOptions={
+                                                departmentOptions
+                                            }
+                                            postalCommunicationOptions={
+                                                postalCommunicationOptions
+                                            }
+                                            onChange={setSelected}
+                                        />
+
                                         {editingInquiryDetails ? (
                                             <div className="space-y-4">
                                                 <div className="flex justify-end">
@@ -1812,89 +1825,6 @@ export default function Dashboard({
                                                     >
                                                         <X />
                                                     </Button>
-                                                </div>
-                                                <div className="grid gap-3 md:grid-cols-3">
-                                                    <FilterSelect
-                                                        label="Status"
-                                                        placeholder="Status"
-                                                        value={selected.status}
-                                                        options={statusOptions}
-                                                        onChange={(status) =>
-                                                            setSelected({
-                                                                ...selected,
-                                                                status,
-                                                            })
-                                                        }
-                                                    />
-                                                    <FilterSelect
-                                                        label="Department"
-                                                        placeholder="Department"
-                                                        value={
-                                                            selected.department
-                                                        }
-                                                        options={
-                                                            departmentOptions
-                                                        }
-                                                        onChange={(
-                                                            department,
-                                                        ) =>
-                                                            setSelected({
-                                                                ...selected,
-                                                                department,
-                                                            })
-                                                        }
-                                                    />
-                                                    <SelectField
-                                                        label="Postal communication"
-                                                        placeholder="Postal communication"
-                                                        value={
-                                                            selected.postal_communication
-                                                        }
-                                                        options={postalCommunicationOptions.map(
-                                                            (option) => ({
-                                                                value: option,
-                                                                label:
-                                                                    option ===
-                                                                    'send'
-                                                                        ? 'Sent'
-                                                                        : 'Pending',
-                                                            }),
-                                                        )}
-                                                        allowEmpty={false}
-                                                        onChange={(
-                                                            postal_communication,
-                                                        ) =>
-                                                            setSelected({
-                                                                ...selected,
-                                                                postal_communication:
-                                                                    postal_communication as
-                                                                        | 'pending'
-                                                                        | 'send',
-                                                            })
-                                                        }
-                                                    />
-                                                    <div className="grid gap-2">
-                                                        <Label htmlFor="next-follow-up">
-                                                            Next follow-up
-                                                        </Label>
-                                                        <Input
-                                                            id="next-follow-up"
-                                                            type="date"
-                                                            value={
-                                                                selected.next_follow_up_at ??
-                                                                ''
-                                                            }
-                                                            onChange={(event) =>
-                                                                setSelected({
-                                                                    ...selected,
-                                                                    next_follow_up_at:
-                                                                        event
-                                                                            .target
-                                                                            .value,
-                                                                })
-                                                            }
-                                                        />
-                                                    </div>
                                                 </div>
                                                 <InquiryDetailsFields
                                                     inquiry={selected}
@@ -1957,7 +1887,7 @@ export default function Dashboard({
                                                     <Send />
                                                     {updatingInquiry
                                                         ? 'Saving...'
-                                                        : editingInquiryDetails
+                                                        : selected.can_update
                                                           ? 'Update inquiry and stream'
                                                           : 'Submit stream'}
                                                 </Button>
@@ -2255,6 +2185,115 @@ function InquiryFormFields({
     );
 }
 
+function InquiryWorkflowFields({
+    inquiry,
+    canEdit,
+    statusOptions,
+    departmentOptions,
+    postalCommunicationOptions,
+    onChange,
+}: {
+    inquiry: Inquiry;
+    canEdit: boolean;
+    statusOptions: string[];
+    departmentOptions: string[];
+    postalCommunicationOptions: string[];
+    onChange: (inquiry: Inquiry) => void;
+}) {
+    return (
+        <section className="rounded-md border p-4">
+            <div className="mb-3">
+                <h3 className="text-sm font-semibold">Workflow</h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                    Status, department, postal communication, and follow-up
+                    schedule.
+                </p>
+            </div>
+
+            {canEdit ? (
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                    <FilterSelect
+                        label="Status"
+                        placeholder="Status"
+                        value={inquiry.status}
+                        options={statusOptions}
+                        onChange={(status) =>
+                            onChange({
+                                ...inquiry,
+                                status,
+                            })
+                        }
+                    />
+                    <FilterSelect
+                        label="Department"
+                        placeholder="Department"
+                        value={inquiry.department}
+                        options={departmentOptions}
+                        onChange={(department) =>
+                            onChange({
+                                ...inquiry,
+                                department,
+                            })
+                        }
+                    />
+                    <SelectField
+                        label="Postal communication"
+                        placeholder="Postal communication"
+                        value={inquiry.postal_communication}
+                        options={postalCommunicationOptions.map((option) => ({
+                            value: option,
+                            label: option === 'send' ? 'Sent' : 'Pending',
+                        }))}
+                        allowEmpty={false}
+                        onChange={(postal_communication) =>
+                            onChange({
+                                ...inquiry,
+                                postal_communication:
+                                    postal_communication as
+                                        | 'pending'
+                                        | 'send',
+                            })
+                        }
+                    />
+                    <div className="grid gap-2">
+                        <Label htmlFor="workflow-next-follow-up">
+                            Next follow-up
+                        </Label>
+                        <Input
+                            id="workflow-next-follow-up"
+                            type="date"
+                            value={inquiry.next_follow_up_at ?? ''}
+                            onChange={(event) =>
+                                onChange({
+                                    ...inquiry,
+                                    next_follow_up_at: event.target.value,
+                                })
+                            }
+                        />
+                    </div>
+                </div>
+            ) : (
+                <div className="grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+                    <Info label="Status" value={inquiry.status} />
+                    <Info label="Department" value={inquiry.department} />
+                    <Info
+                        label="Postal communication"
+                        value={
+                            inquiry.postal_communication === 'send'
+                                ? 'Sent'
+                                : 'Pending'
+                        }
+                    />
+                    <Info
+                        label="Next follow-up"
+                        value={inquiry.next_follow_up_at ?? 'Not scheduled'}
+                    />
+                </div>
+            )}
+        </section>
+    );
+}
+
 function InquiryDetailsFields({
     inquiry,
     programs,
@@ -2445,20 +2484,6 @@ function InquiryDetailsSummary({
                 <Info
                     label="Assigned user"
                     value={inquiry.assigned_user?.name ?? 'Unassigned'}
-                />
-                <Info label="Status" value={inquiry.status} />
-                <Info label="Department" value={inquiry.department} />
-                <Info
-                    label="Postal communication"
-                    value={
-                        inquiry.postal_communication === 'send'
-                            ? 'Sent'
-                            : 'Pending'
-                    }
-                />
-                <Info
-                    label="Next follow-up"
-                    value={inquiry.next_follow_up_at ?? 'Not scheduled'}
                 />
                 <Info label="Address" value={inquiry.address ?? 'Not set'} />
                 <Info
