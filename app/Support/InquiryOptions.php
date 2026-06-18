@@ -25,5 +25,5 @@ final class InquiryOptions
 
     public const DEPARTMENTS = ['admission', 'academics', 'accounts'];
 
-    public const POSTAL_COMMUNICATIONS = ['pending', 'send'];
+    public const POSTAL_COMMUNICATIONS = ['pending', 'created', 'sent'];
 }

@@ -80,7 +80,7 @@ type Inquiry = {
     assigned_user_id: number | null;
     assigned_user: Option | null;
     department: string;
-    postal_communication: 'pending' | 'send';
+    postal_communication: 'pending' | 'created' | 'sent';
     next_follow_up_at: string | null;
     assigned_at: string | null;
     last_activity_at: string | null;
@@ -211,7 +211,7 @@ export default function Dashboard({
     sourceOptions,
     statusOptions,
     departmentOptions,
-    postalCommunicationOptions = ['pending', 'send'],
+    postalCommunicationOptions = ['pending', 'created', 'sent'],
     inquiryCreationDefaults,
     filterCounts,
     queueCounts,
@@ -1202,8 +1202,9 @@ export default function Dashboard({
                                                     <Eye />
                                                     View
                                                 </Button>
-                                                {inquiry.postal_communication ===
-                                                    'send' && (
+                                                {canDownloadInvitationLetter(
+                                                    inquiry,
+                                                ) && (
                                                     <Button
                                                         asChild
                                                         type="button"
@@ -2242,7 +2243,7 @@ function InquiryWorkflowFields({
                         value={inquiry.postal_communication}
                         options={postalCommunicationOptions.map((option) => ({
                             value: option,
-                            label: option === 'send' ? 'Sent' : 'Pending',
+                            label: postalCommunicationLabel(option),
                         }))}
                         allowEmpty={false}
                         onChange={(postal_communication) =>
@@ -2251,7 +2252,8 @@ function InquiryWorkflowFields({
                                 postal_communication:
                                     postal_communication as
                                         | 'pending'
-                                        | 'send',
+                                        | 'created'
+                                        | 'sent',
                             })
                         }
                     />
@@ -2278,11 +2280,9 @@ function InquiryWorkflowFields({
                     <Info label="Department" value={inquiry.department} />
                     <Info
                         label="Postal communication"
-                        value={
-                            inquiry.postal_communication === 'send'
-                                ? 'Sent'
-                                : 'Pending'
-                        }
+                        value={postalCommunicationLabel(
+                            inquiry.postal_communication,
+                        )}
                     />
                     <Info
                         label="Next follow-up"
@@ -2429,7 +2429,7 @@ function InquiryDetailsSummary({
                     </p>
                 </div>
                 <div className="flex items-center gap-1">
-                    {inquiry.postal_communication === 'send' && (
+                    {canDownloadInvitationLetter(inquiry) && (
                         <Button
                             asChild
                             type="button"
@@ -2884,6 +2884,20 @@ function LastDiscussion({
             )}
         </div>
     );
+}
+
+function canDownloadInvitationLetter(inquiry: Inquiry): boolean {
+    return ['created', 'sent'].includes(inquiry.postal_communication);
+}
+
+function postalCommunicationLabel(value: string): string {
+    const labels: Record<string, string> = {
+        pending: 'Pending',
+        created: 'Created',
+        sent: 'Sent',
+    };
+
+    return labels[value] ?? value;
 }
 
 function StatusBadge({ status }: { status: string }) {

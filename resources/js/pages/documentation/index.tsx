@@ -122,7 +122,7 @@ const helpTopics = [
     },
     {
         title: 'Invitation letter PDF is unavailable',
-        text: 'Postal Communication must be set to Sent. Pending inquiries cannot generate the student invitation letter.',
+        text: 'Postal Communication must be set to Created before the student invitation letter can be generated. Use Sent only after the letter has already been delivered.',
     },
     {
         title: 'A program or campus cannot be deleted',
@@ -498,7 +498,8 @@ export default function DocumentationIndex() {
                                         </h3>
                                     </div>
                                     <ul className="mt-4 space-y-3">
-                                        <CheckItem text="Set Postal Communication to Sent from inquiry edit mode." />
+                                        <CheckItem text="Set Postal Communication to Created to generate the letter PDF." />
+                                        <CheckItem text="Set Postal Communication to Sent after the letter has already been delivered." />
                                         <CheckItem text="Use the PDF icon in the table or inquiry detail modal." />
                                         <CheckItem text="The letter includes student, contact, program, campus, and address details." />
                                         <CheckItem text="Filename follows student-inquiry-Student-Name.pdf." />

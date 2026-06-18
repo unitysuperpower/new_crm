@@ -228,7 +228,7 @@ class InquiryController extends Controller
     public function invitationLetter(Request $request, Inquiry $inquiry): HttpResponse
     {
         Gate::authorize('view', $inquiry);
-        abort_unless($inquiry->postal_communication === 'send', 404);
+        abort_unless(in_array($inquiry->postal_communication, ['created', 'sent'], true), 404);
 
         $inquiry->loadMissing(['program:id,name,campus_id,duration', 'campusModel:id,name']);
         $logoPath = public_path('logo.jpeg');
