@@ -161,6 +161,7 @@ class InquiryController extends Controller
                 'canSelectInquiryAssignee' => $request->user()->role === UserRole::SuperAdmin,
                 'canChangeInquiryDepartment' => $request->user()->role === UserRole::SuperAdmin,
                 'canManageCampus' => $request->user()->can('update', new Campus),
+                'canViewDashboardMetrics' => in_array($request->user()->role, [UserRole::SuperAdmin, UserRole::Admin], true),
             ],
         ]);
     }

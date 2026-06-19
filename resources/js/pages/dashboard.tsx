@@ -258,6 +258,7 @@ export default function Dashboard({
         canSelectInquiryAssignee: boolean;
         canChangeInquiryDepartment: boolean;
         canManageCampus: boolean;
+        canViewDashboardMetrics: boolean;
     };
 }) {
     // State variables for managing the dashboard's interactive features, such as filtering, creating inquiries, importing inquiries, viewing inquiry details, managing selected inquiries for bulk actions, handling report generation, and managing search suggestions. These state variables are used to control the visibility of dialogs, store form data, track loading states, and manage user interactions throughout the dashboard.
@@ -704,49 +705,53 @@ export default function Dashboard({
                     </div>
                 </div>
 
-                <div className="grid gap-3 md:grid-cols-4">
-                    <Metric
-                        label={
-                            pageMode === 'assigned'
-                                ? 'My inquiries'
-                                : 'All inquiries'
-                        }
-                        value={queueCounts.total_inquiries}
-                    />
-                    <Metric
-                        label="Assigned today"
-                        value={queueCounts.assigned_today}
-                    />
-                    <Metric
-                        label="Follow-ups today"
-                        value={queueCounts.follow_ups_today}
-                    />
-                    <Metric
-                        label="Next 3 days"
-                        value={queueCounts.follow_ups_next_3_days}
-                    />
-                </div>
+                {crmPermissions.canViewDashboardMetrics && (
+                    <div className="grid gap-3 md:grid-cols-4">
+                        <Metric
+                            label={
+                                pageMode === 'assigned'
+                                    ? 'My inquiries'
+                                    : 'All inquiries'
+                            }
+                            value={queueCounts.total_inquiries}
+                        />
+                        <Metric
+                            label="Assigned today"
+                            value={queueCounts.assigned_today}
+                        />
+                        <Metric
+                            label="Follow-ups today"
+                            value={queueCounts.follow_ups_today}
+                        />
+                        <Metric
+                            label="Next 3 days"
+                            value={queueCounts.follow_ups_next_3_days}
+                        />
+                    </div>
+                )}
 
                 <div className="crm-panel p-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <h2 className="text-sm font-semibold">
-                                {filterForm.queue === 'assigned_today'
-                                    ? 'Assigned today'
-                                    : pageMode === 'assigned'
-                                      ? 'My assigned inquiries'
-                                      : 'All inquiries'}
-                            </h2>
-                            <p className="text-sm text-muted-foreground">
-                                {filterForm.queue === 'assigned_today'
-                                    ? pageMode === 'assigned'
-                                        ? 'Inquiries assigned to you today.'
-                                        : 'All inquiries assigned today across active campuses.'
-                                    : pageMode === 'assigned'
-                                      ? 'Review every inquiry assigned to you and focus by follow-up date.'
-                                      : 'Complete inquiry register across active campuses.'}
-                            </p>
-                        </div>
+                        {crmPermissions.canViewDashboardMetrics && (
+                            <div>
+                                <h2 className="text-sm font-semibold">
+                                    {filterForm.queue === 'assigned_today'
+                                        ? 'Assigned today'
+                                        : pageMode === 'assigned'
+                                          ? 'My assigned inquiries'
+                                          : 'All inquiries'}
+                                </h2>
+                                <p className="text-sm text-muted-foreground">
+                                    {filterForm.queue === 'assigned_today'
+                                        ? pageMode === 'assigned'
+                                            ? 'Inquiries assigned to you today.'
+                                            : 'All inquiries assigned today across active campuses.'
+                                        : pageMode === 'assigned'
+                                          ? 'Review every inquiry assigned to you and focus by follow-up date.'
+                                          : 'Complete inquiry register across active campuses.'}
+                                </p>
+                            </div>
+                        )}
                         <div className="flex flex-wrap items-center gap-2">
                             <div className="inline-flex flex-wrap rounded-md border bg-muted/35 p-1">
                                 <Button
@@ -763,9 +768,11 @@ export default function Dashboard({
                                     {pageMode === 'assigned'
                                         ? 'All assigned'
                                         : 'All inquiries'}
-                                    <Badge variant="outline">
-                                        {queueCounts.total_inquiries}
-                                    </Badge>
+                                    {crmPermissions.canViewDashboardMetrics && (
+                                        <Badge variant="outline">
+                                            {queueCounts.total_inquiries}
+                                        </Badge>
+                                    )}
                                 </Button>
                                 <Button
                                     type="button"
@@ -781,9 +788,11 @@ export default function Dashboard({
                                     }
                                 >
                                     Assigned today
-                                    <Badge variant="outline">
-                                        {queueCounts.assigned_today}
-                                    </Badge>
+                                    {crmPermissions.canViewDashboardMetrics && (
+                                        <Badge variant="outline">
+                                            {queueCounts.assigned_today}
+                                        </Badge>
+                                    )}
                                 </Button>
                                 {pageMode === 'assigned' && (
                                     <>
@@ -801,11 +810,13 @@ export default function Dashboard({
                                             }
                                         >
                                             Yesterday
-                                            <Badge variant="outline">
-                                                {
-                                                    queueCounts.follow_ups_yesterday
-                                                }
-                                            </Badge>
+                                            {crmPermissions.canViewDashboardMetrics && (
+                                                <Badge variant="outline">
+                                                    {
+                                                        queueCounts.follow_ups_yesterday
+                                                    }
+                                                </Badge>
+                                            )}
                                         </Button>
                                         <Button
                                             type="button"
@@ -821,9 +832,13 @@ export default function Dashboard({
                                             }
                                         >
                                             Today
-                                            <Badge variant="outline">
-                                                {queueCounts.follow_ups_today}
-                                            </Badge>
+                                            {crmPermissions.canViewDashboardMetrics && (
+                                                <Badge variant="outline">
+                                                    {
+                                                        queueCounts.follow_ups_today
+                                                    }
+                                                </Badge>
+                                            )}
                                         </Button>
                                         <Button
                                             type="button"
@@ -842,11 +857,13 @@ export default function Dashboard({
                                             }
                                         >
                                             Next 3 days
-                                            <Badge variant="outline">
-                                                {
-                                                    queueCounts.follow_ups_next_3_days
-                                                }
-                                            </Badge>
+                                            {crmPermissions.canViewDashboardMetrics && (
+                                                <Badge variant="outline">
+                                                    {
+                                                        queueCounts.follow_ups_next_3_days
+                                                    }
+                                                </Badge>
+                                            )}
                                         </Button>
                                     </>
                                 )}

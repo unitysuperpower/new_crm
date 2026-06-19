@@ -37,7 +37,7 @@
         @if ($logoData)
             <img class="logo" src="{{ $logoData }}" alt="Aurea Education">
         @endif
-        <div class="brand">AUREA EDUCATION</div>
+        <div class="brand">AUREA</div>
         <div class="subtitle">Academic Admissions and Student Services</div>
         <div class="generated"><strong>Generated:</strong> {{ $generatedAt }}</div>
     </div>
@@ -72,7 +72,7 @@
         </colgroup>
         <thead>
             <tr>
-                <th>#</th>
+                {{-- <th>#</th> --}}
                 <th>Student</th>
                 <th>Contact</th>
                 <th>Program</th>
@@ -86,7 +86,7 @@
         <tbody>
             @forelse ($inquiries as $inquiry)
                 <tr>
-                    <td>{{ $inquiry['id'] }}</td>
+                    {{-- <td>{{ $inquiry['id'] }}</td> --}}
                     <td class="student">{{ $inquiry['name'] }}</td>
                     <td>{{ $inquiry['phone'] }}<br><span class="muted">{{ $inquiry['email'] ?: 'No email' }}</span></td>
                     <td>{{ $inquiry['program'] ?? 'Not set' }}</td>
