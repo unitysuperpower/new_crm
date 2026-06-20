@@ -20,7 +20,9 @@ class UseClientTimezone
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $timezone = $request->header('X-Timezone') ?? $request->query('timezone');
+        $timezone = $request->header('X-Timezone')
+            ?? $request->query('timezone')
+            ?? $request->cookie('client_timezone');
 
         if (! is_string($timezone) || ! in_array($timezone, DateTimeZone::listIdentifiers(), true)) {
             $timezone = self::FALLBACK_TIMEZONE;
@@ -29,6 +31,22 @@ class UseClientTimezone
         config(['app.timezone' => $timezone]);
         date_default_timezone_set($timezone);
 
-        return $next($request);
+        $response = $next($request);
+
+        if ($request->cookie('client_timezone') !== $timezone) {
+            $response->headers->setCookie(cookie(
+                'client_timezone',
+                $timezone,
+                60 * 24 * 365,
+                '/',
+                null,
+                $request->isSecure(),
+                false,
+                false,
+                'lax',
+            ));
+        }
+
+        return $response;
     }
 }

@@ -1,5 +1,6 @@
-import { createInertiaApp } from '@inertiajs/react';
-import type { ComponentType } from 'react';
+import { createInertiaApp, router } from '@inertiajs/react';
+import { useEffect  } from 'react';
+import type {ComponentType} from 'react';
 import { GlobalLoadingOverlay } from '@/components/global-loading-overlay';
 import { Toaster } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -11,6 +12,36 @@ import SettingsLayout from '@/layouts/settings/layout';
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 const pages = import.meta.glob('./pages/**/*.tsx');
 const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const timezoneCookieChanged = persistBrowserTimezone(localTimezone);
+
+function persistBrowserTimezone(timezone: string): boolean {
+    if (!timezone) {
+        return false;
+    }
+
+    const storedTimezone = document.cookie
+        .split('; ')
+        .find((cookie) => cookie.startsWith('client_timezone='))
+        ?.split('=')[1];
+
+    if (storedTimezone === encodeURIComponent(timezone)) {
+        return false;
+    }
+
+    document.cookie = `client_timezone=${encodeURIComponent(timezone)}; path=/; max-age=31536000; samesite=lax`;
+
+    return true;
+}
+
+function BrowserTimezoneSync() {
+    useEffect(() => {
+        if (timezoneCookieChanged) {
+            router.reload({ preserveScroll: true, preserveState: true });
+        }
+    }, []);
+
+    return null;
+}
 
 createInertiaApp({
     resolve: async (name) => {
@@ -41,6 +72,7 @@ createInertiaApp({
         return (
             <TooltipProvider delayDuration={0}>
                 {app}
+                <BrowserTimezoneSync />
                 <GlobalLoadingOverlay />
                 <Toaster />
             </TooltipProvider>
