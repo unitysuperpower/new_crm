@@ -10,6 +10,7 @@ import SettingsLayout from '@/layouts/settings/layout';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Laravel';
 const pages = import.meta.glob('./pages/**/*.tsx');
+const localTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 createInertiaApp({
     resolve: async (name) => {
@@ -47,6 +48,14 @@ createInertiaApp({
     },
     progress: {
         color: '#4B5563',
+    },
+    defaults: {
+        visitOptions: (_href, options) => ({
+            headers: {
+                ...options.headers,
+                ...(localTimezone ? { 'X-Timezone': localTimezone } : {}),
+            },
+        }),
     },
 });
 

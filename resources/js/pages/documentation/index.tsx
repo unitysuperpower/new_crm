@@ -130,7 +130,7 @@ const helpTopics = [
     },
     {
         title: 'Filters show unexpected dates',
-        text: 'Table date filters use created_at, follow-up queues use next_follow_up_at, and report date filters use updated_at in the Asia/Karachi timezone.',
+        text: 'The CRM uses the browser\'s local timezone for dates and timestamps. Table date filters use created_at, follow-up queues use next_follow_up_at, and report date filters use updated_at.',
     },
 ];
 

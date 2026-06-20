@@ -400,7 +400,7 @@ export default function Dashboard({
                     mode: pageMode,
                 });
                 const response = await fetch(`/inquiries/search?${params}`, {
-                    headers: { Accept: 'application/json' },
+                    headers: localTimezoneHeaders({ Accept: 'application/json' }),
                     signal: controller.signal,
                 });
 
@@ -665,7 +665,7 @@ export default function Dashboard({
             const response = await fetch(
                 `/inquiries/report?${reportQuery(reportFilters)}`,
                 {
-                    headers: { Accept: 'application/json' },
+                    headers: localTimezoneHeaders({ Accept: 'application/json' }),
                 },
             );
 
@@ -1277,7 +1277,9 @@ export default function Dashboard({
                                                         title="Download invitation letter PDF"
                                                     >
                                                         <a
-                                                            href={`/inquiries/${inquiry.id}/invitation-letter.pdf`}
+                                                            href={withLocalTimezone(
+                                                                `/inquiries/${inquiry.id}/invitation-letter.pdf`,
+                                                            )}
                                                             aria-label={`Download invitation letter for ${inquiry.name}`}
                                                         >
                                                             <FileDown />
@@ -1738,7 +1740,9 @@ export default function Dashboard({
                                     type="button"
                                     disabled={report.total === 0}
                                     onClick={() => {
-                                        window.location.href = `/inquiries/report/pdf?${reportQuery(reportFilters)}`;
+                                        window.location.href = withLocalTimezone(
+                                            `/inquiries/report/pdf?${reportQuery(reportFilters)}`,
+                                        );
                                     }}
                                 >
                                     <FileDown />
@@ -2535,7 +2539,9 @@ function InquiryDetailsSummary({
                             title="Download invitation letter PDF"
                         >
                             <a
-                                href={`/inquiries/${inquiry.id}/invitation-letter.pdf`}
+                                href={withLocalTimezone(
+                                    `/inquiries/${inquiry.id}/invitation-letter.pdf`,
+                                )}
                                 aria-label={`Download invitation letter for ${inquiry.name}`}
                             >
                                 <FileDown />
@@ -2799,6 +2805,29 @@ function formatLocalDate(date: Date): string {
     const day = String(date.getDate()).padStart(2, '0');
 
     return `${year}-${month}-${day}`;
+}
+
+function browserTimezone(): string | null {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+}
+
+function localTimezoneHeaders(headers: Record<string, string>): Record<string, string> {
+    const timezone = browserTimezone();
+
+    return timezone ? { ...headers, 'X-Timezone': timezone } : headers;
+}
+
+function withLocalTimezone(path: string): string {
+    const timezone = browserTimezone();
+
+    if (!timezone) {
+        return path;
+    }
+
+    const url = new URL(path, window.location.origin);
+    url.searchParams.set('timezone', timezone);
+
+    return `${url.pathname}${url.search}`;
 }
 
 function SearchSuggestionPanel({
