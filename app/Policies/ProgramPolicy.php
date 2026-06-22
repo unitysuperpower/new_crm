@@ -21,7 +21,8 @@ class ProgramPolicy
      */
     public function view(User $user, Program $program): bool
     {
-        return $user->hasPermission(UserPermission::ManageProgram);
+        return $user->hasPermission(UserPermission::ManageProgram)
+            && $user->canAccessCampus($program->campus_id);
     }
 
     /**
@@ -37,7 +38,8 @@ class ProgramPolicy
      */
     public function update(User $user, Program $program): bool
     {
-        return $user->hasPermission(UserPermission::ManageProgram);
+        return $user->hasPermission(UserPermission::ManageProgram)
+            && $user->canAccessCampus($program->campus_id);
     }
 
     /**
@@ -45,7 +47,8 @@ class ProgramPolicy
      */
     public function delete(User $user, Program $program): bool
     {
-        return $user->hasPermission(UserPermission::ManageProgram);
+        return $user->hasPermission(UserPermission::ManageProgram)
+            && $user->canAccessCampus($program->campus_id);
     }
 
     /**

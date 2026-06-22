@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreProgramRequest;
 use App\Http\Requests\UpdateProgramRequest;
+use App\Enums\UserRole;
 use App\Models\Campus;
 use App\Models\Program;
 use Illuminate\Http\RedirectResponse;
@@ -18,6 +19,7 @@ class ProgramController extends Controller
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Program::class);
+        $user = $request->user();
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
@@ -27,6 +29,10 @@ class ProgramController extends Controller
         $programs = Program::query()
             ->with('campus:id,name')
             ->withCount('inquiries')
+            ->when(
+                $user->role !== UserRole::SuperAdmin,
+                fn ($query) => $query->whereIn('campus_id', $user->campuses()->select('campuses.id')),
+            )
             ->when($filters['search'] ?? null, function ($query, string $search) {
                 $query->where(function ($inner) use ($search): void {
                     $inner->where('name', 'like', "%{$search}%")
@@ -63,6 +69,10 @@ class ProgramController extends Controller
             ],
             'programs' => $programs,
             'campuses' => Campus::query()
+                ->when(
+                    $user->role !== UserRole::SuperAdmin,
+                    fn ($query) => $query->whereIn('id', $user->campuses()->select('campuses.id')),
+                )
                 ->orderBy('name')
                 ->get(['id', 'name', 'is_active']),
             'metrics' => [
@@ -76,7 +86,10 @@ class ProgramController extends Controller
     // The store method handles the creation of a new program by validating the incoming request data, creating a new Program record in the database, and then redirecting back to the previous page with a success message, ensuring that only authorized users can perform this action.
     public function store(StoreProgramRequest $request): RedirectResponse
     {
-        Program::create($request->validated());
+        $data = $request->validated();
+        abort_unless($request->user()->canAccessCampus($data['campus_id']), 403);
+
+        Program::create($data);
 
         return back()->with('success', 'Program created.');
     }
@@ -84,7 +97,10 @@ class ProgramController extends Controller
     // The update method allows authorized users to modify the details of an existing program, ensuring that the information remains accurate and up-to-date as the program progresses through different stages of development.
     public function update(UpdateProgramRequest $request, Program $program): RedirectResponse
     {
-        $program->update($request->validated());
+        $data = $request->validated();
+        abort_unless($request->user()->canAccessCampus($data['campus_id']), 403);
+
+        $program->update($data);
 
         return back()->with('success', 'Program updated.');
     }
