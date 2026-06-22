@@ -17,6 +17,7 @@ import {
 
 type RoleOption = { value: string; label: string };
 type PermissionOption = { value: string; label: string };
+type CampusOption = { id: number; name: string; is_active: boolean };
 type ManagedUser = {
     id: number;
     name: string;
@@ -25,6 +26,7 @@ type ManagedUser = {
     role_label: string;
     department: string;
     permissions: string[];
+    campus_ids: number[];
 };
 
 export default function UsersIndex({
@@ -32,11 +34,13 @@ export default function UsersIndex({
     roles,
     permissions,
     departments,
+    campuses,
 }: {
     users: ManagedUser[];
     roles: RoleOption[];
     permissions: PermissionOption[];
     departments: string[];
+    campuses: CampusOption[];
 }) {
     return (
         <>
@@ -64,6 +68,7 @@ export default function UsersIndex({
                             roles={roles}
                             permissions={permissions}
                             departments={departments}
+                            campuses={campuses}
                         />
                     ))}
                 </div>
@@ -77,23 +82,31 @@ function UserPermissionRow({
     roles,
     permissions,
     departments,
+    campuses,
 }: {
     user: ManagedUser;
     roles: RoleOption[];
     permissions: PermissionOption[];
     departments: string[];
+    campuses: CampusOption[];
 }) {
     const [role, setRole] = useState(user.role);
     const [department, setDepartment] = useState(user.department);
     const [selectedPermissions, setSelectedPermissions] = useState(
         user.permissions,
     );
+    const [selectedCampusIds, setSelectedCampusIds] = useState(user.campus_ids);
 
     const submit = (event: FormEvent) => {
         event.preventDefault();
         router.patch(
             `/settings/users/${user.id}`,
-            { role, department, permissions: selectedPermissions },
+            {
+                role,
+                department,
+                permissions: selectedPermissions,
+                campus_ids: selectedCampusIds,
+            },
             { preserveScroll: true },
         );
     };
@@ -103,6 +116,14 @@ function UserPermissionRow({
             checked
                 ? [...new Set([...current, permission])]
                 : current.filter((item) => item !== permission),
+        );
+    };
+
+    const toggleCampus = (campusId: number, checked: boolean) => {
+        setSelectedCampusIds((current) =>
+            checked
+                ? [...new Set([...current, campusId])]
+                : current.filter((id) => id !== campusId),
         );
     };
 
@@ -181,6 +202,43 @@ function UserPermissionRow({
                         <span>{permission.label}</span>
                     </Label>
                 ))}
+            </div>
+
+            <div className="mt-5 border-t pt-5">
+                <div className="mb-3">
+                    <div className="font-medium">Campus access</div>
+                    <p className="text-sm text-muted-foreground">
+                        {user.role === 'super_admin'
+                            ? 'Super Admin has access to every campus.'
+                            : 'Select the campuses this employee can access.'}
+                    </p>
+                </div>
+                {user.role !== 'super_admin' && (
+                    <div className="grid gap-2 sm:grid-cols-2">
+                        {campuses.map((campus) => (
+                            <Label
+                                key={campus.id}
+                                className="flex cursor-pointer items-center gap-2 rounded-md border bg-muted/20 p-3 transition-colors hover:bg-muted/50"
+                            >
+                                <Checkbox
+                                    checked={selectedCampusIds.includes(campus.id)}
+                                    onCheckedChange={(checked) =>
+                                        toggleCampus(campus.id, checked === true)
+                                    }
+                                />
+                                <span className="flex-1">{campus.name}</span>
+                                {!campus.is_active && (
+                                    <Badge variant="outline">Hidden</Badge>
+                                )}
+                            </Label>
+                        ))}
+                        {campuses.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                                Create a campus before assigning access.
+                            </p>
+                        )}
+                    </div>
+                )}
             </div>
         </form>
     );

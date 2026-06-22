@@ -18,6 +18,7 @@ import {
     History,
     LayoutDashboard,
     LockKeyhole,
+    MapPinned,
     Search,
     ServerCog,
     ShieldCheck,
@@ -36,6 +37,7 @@ import { Input } from '@/components/ui/input';
 const navigation = [
     ['start', 'Start here', Sparkles],
     ['roles', 'Roles and access', ShieldCheck],
+    ['campus-access', 'Campus access', MapPinned],
     ['inquiries', 'Inquiry guide', ClipboardList],
     ['csv', 'CSV imports', FileSpreadsheet],
     ['follow-up', 'Follow-ups and streams', CalendarClock],
@@ -48,7 +50,7 @@ const navigation = [
 const quickSteps = [
     {
         title: 'Prepare the workspace',
-        text: 'Create active campuses, programs, employees, roles, and permissions before daily inquiry work begins.',
+        text: 'Create active campuses and programs, then give every employee access to the campuses they should work with.',
         icon: Building2,
     },
     {
@@ -91,6 +93,13 @@ const inquirySteps = [
     ],
 ];
 
+const campusAccessSteps = [
+    ['Open Users', 'Super Admin opens Settings > Users and selects the employee.'],
+    ['Choose campuses', 'Select every campus the employee is allowed to work with, then save the employee record.'],
+    ['Assign safely', 'An inquiry can only be assigned when the selected employee has access to that inquiry campus.'],
+    ['Review visibility', 'The employee sees only their permitted campus inquiries, programs, filters, reports, and sidebar campus switches.'],
+];
+
 const csvColumns = [
     ['name', 'Required', 'Student name'],
     ['phone', 'Required', 'Primary phone and duplicate key'],
@@ -98,9 +107,10 @@ const csvColumns = [
     ['city', 'Optional', 'Current city'],
     ['address', 'Optional', 'Full postal address'],
     ['source', 'Optional', 'Website, Facebook, WhatsApp, referral, etc.'],
-    ['program', 'Optional', 'Must match an existing program name'],
+    ['program', 'Optional', 'Matches an existing program name for the selected campus'],
+    ['program_duration', 'Optional', 'Program duration, for example 4 Years'],
     ['previous_program', 'Optional', 'Previous education or qualification'],
-    ['campus', 'Optional', 'Matched against active campuses'],
+    ['campus', 'Optional', 'Matched against an active campus the importer can access'],
     ['status', 'Required', 'A supported inquiry status'],
     ['department', 'Required', 'admission, academics, or accounts'],
     ['next_follow_up_at', 'Optional', 'Date in YYYY-MM-DD format'],
@@ -114,7 +124,15 @@ const helpTopics = [
     },
     {
         title: 'An inquiry is missing from the Inquiries page',
-        text: 'The Inquiries page only shows records assigned to the signed-in employee. Use Dashboard for all permitted inquiries and confirm the campus is active.',
+        text: 'The Inquiries page only shows records assigned to the signed-in employee. Confirm the employee has access to the inquiry campus and that the campus is active.',
+    },
+    {
+        title: 'An employee cannot be assigned an inquiry',
+        text: 'Super Admin must first open Settings > Users and grant that employee access to the inquiry campus. Then assign or reassign the inquiry from the Dashboard.',
+    },
+    {
+        title: 'A campus is missing from a form or report',
+        text: 'Employees only receive campus options they are allowed to access. Super Admin can update the employee campus access from Settings > Users.',
     },
     {
         title: 'A CSV row was not imported',
@@ -162,7 +180,7 @@ export default function DocumentationIndex() {
                         <p className="crm-page-description">
                             Practical instructions for managing student
                             inquiries, assignments, follow-ups, CSV imports,
-                            reports, employees, campuses, and programs.
+                            reports, employee access, campuses, and programs.
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -181,39 +199,78 @@ export default function DocumentationIndex() {
                     </div>
                 </header>
 
+                <div className="grid border sm:grid-cols-3">
+                    <GuideSignal
+                        icon={ShieldCheck}
+                        title="Controlled access"
+                        text="Super Admin grants campus access per employee."
+                    />
+                    <GuideSignal
+                        icon={History}
+                        title="Traceable work"
+                        text="Every submitted discussion becomes history."
+                    />
+                    <GuideSignal
+                        icon={FileDown}
+                        title="Ready to export"
+                        text="Reports and letters use the current CRM data."
+                    />
+                </div>
+
                 <div className="grid min-w-0 gap-6 xl:grid-cols-[15rem_minmax(0,1fr)]">
                     <aside className="hidden xl:block">
-                        <div className="sticky top-20 space-y-4">
-                            <nav className="border-l" aria-label="User guide">
-                                {navigation.map(([id, label, Icon]) => (
-                                    <a
-                                        key={id}
-                                        href={`#${id}`}
-                                        className="flex items-center gap-2.5 border-l-2 border-transparent px-4 py-2.5 text-sm text-muted-foreground transition hover:border-primary hover:bg-muted/40 hover:text-foreground"
-                                    >
-                                        <Icon className="size-4" />
-                                        {label}
-                                    </a>
-                                ))}
-                            </nav>
-                            <div className="rounded-md border bg-muted/20 p-4">
-                                <div className="text-xs font-semibold uppercase">
-                                    Current system
-                                </div>
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                    <Badge variant="secondary">3 roles</Badge>
-                                    <Badge variant="secondary">
-                                        PDF export
-                                    </Badge>
-                                    <Badge variant="secondary">
-                                        CSV archive
-                                    </Badge>
+                        <div className="sticky top-20 h-[calc(100svh-6rem)] overflow-y-auto border-r pr-4">
+                            <div className="space-y-4 pb-4">
+                                <nav className="border-l" aria-label="User guide">
+                                    {navigation.map(([id, label, Icon]) => (
+                                        <a
+                                            key={id}
+                                            href={`#${id}`}
+                                            className="flex items-center gap-2.5 border-l-2 border-transparent px-4 py-2.5 text-sm text-muted-foreground transition hover:border-primary hover:bg-muted/40 hover:text-foreground"
+                                        >
+                                            <Icon className="size-4" />
+                                            {label}
+                                        </a>
+                                    ))}
+                                </nav>
+                                <div className="rounded-md border bg-muted/20 p-4">
+                                    <div className="text-xs font-semibold uppercase">
+                                        Current system
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap gap-1.5">
+                                        <Badge variant="secondary">3 roles</Badge>
+                                        <Badge variant="secondary">
+                                            PDF export
+                                        </Badge>
+                                        <Badge variant="secondary">
+                                            CSV archive
+                                        </Badge>
+                                        <Badge variant="secondary">
+                                            Campus access
+                                        </Badge>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </aside>
 
                     <main className="min-w-0 space-y-12">
+                        <nav
+                            className="flex gap-2 overflow-x-auto border-b pb-3 xl:hidden"
+                            aria-label="User guide sections"
+                        >
+                            {navigation.map(([id, label, Icon]) => (
+                                <a
+                                    key={id}
+                                    href={`#${id}`}
+                                    className="flex shrink-0 items-center gap-2 border px-3 py-2 text-xs font-medium text-muted-foreground transition hover:border-primary/50 hover:text-foreground"
+                                >
+                                    <Icon className="size-3.5" />
+                                    {label}
+                                </a>
+                            ))}
+                        </nav>
+
                         <section id="start" className="scroll-mt-24 space-y-5">
                             <SectionTitle
                                 icon={Sparkles}
@@ -285,21 +342,64 @@ export default function DocumentationIndex() {
                                     <tbody>
                                         <RoleRow
                                             role="Super Admin"
-                                            responsibility="Manages employees, permissions, programs, campuses, all inquiries, assignment, reassignment, imports, and reports."
-                                            limit="Only role that can assign or reassign inquiry ownership."
+                                            responsibility="Manages employees, campus access, permissions, programs, campuses, all inquiries, assignment, reassignment, imports, and reports."
+                                            limit="Has access to every campus and is the only role that can assign or reassign inquiry ownership."
                                         />
                                         <RoleRow
                                             role="Admin"
                                             responsibility="Manages inquiry operations and reference data according to granted permissions."
-                                            limit="Cannot assign inquiries unless the role policy is changed."
+                                            limit="Can only work with the campuses granted by Super Admin and cannot assign inquiries."
                                         />
                                         <RoleRow
                                             role="User"
                                             responsibility="Creates inquiries, works assigned inquiries, schedules follow-ups, and records discussions."
-                                            limit="Only edits assigned inquiries and only sees permitted menu items."
+                                            limit="Only sees permitted campuses, and only edits assigned inquiries within those campuses."
                                         />
                                     </tbody>
                                 </table>
+                            </div>
+                        </section>
+
+                        <section
+                            id="campus-access"
+                            className="scroll-mt-24 space-y-5"
+                        >
+                            <SectionTitle
+                                icon={MapPinned}
+                                eyebrow="Data visibility"
+                                title="Set employee campus access"
+                                description="Campus access is a data boundary. It controls which campus inquiries, programs, search results, reports, streams, and campus switches an employee can use."
+                            />
+                            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+                                <div className="divide-y border">
+                                    {campusAccessSteps.map(
+                                        ([title, text], index) => (
+                                            <GuideStep
+                                                key={title}
+                                                number={index + 1}
+                                                title={title}
+                                                text={text}
+                                            />
+                                        ),
+                                    )}
+                                </div>
+                                <div className="space-y-3">
+                                    <InfoPanel
+                                        icon={UsersRound}
+                                        title="Where to manage"
+                                        text="Settings > Users. This screen is available to Super Admin only."
+                                    />
+                                    <InfoPanel
+                                        icon={LockKeyhole}
+                                        title="No campus selected"
+                                        text="The employee cannot work with campus-linked inquiries until access is granted. Older inquiries without a campus remain available until classified."
+                                    />
+                                    <InfoPanel
+                                        icon={UserCheck}
+                                        title="Before assignment"
+                                        text="Grant the employee the campus first. The CRM blocks an assignment that would give an employee an inaccessible inquiry."
+                                    />
+                                </div>
                             </div>
                         </section>
 
@@ -330,12 +430,12 @@ export default function DocumentationIndex() {
                                     <InfoPanel
                                         icon={LayoutDashboard}
                                         title="Dashboard scope"
-                                        text="Shows all inquiries allowed by permissions and active-campus visibility. Super Admin assigns from this table."
+                                        text="Shows inquiries within the employee's campus access. Super Admin sees every campus and assigns from this table."
                                     />
                                     <InfoPanel
                                         icon={UserCheck}
                                         title="Inquiries scope"
-                                        text="Shows only inquiries assigned to the signed-in employee, including assigned-today and follow-up queues."
+                                        text="Shows only the signed-in employee's assigned inquiries within their campus access, including assigned-today and follow-up queues."
                                     />
                                     <InfoPanel
                                         icon={LockKeyhole}
@@ -448,7 +548,7 @@ export default function DocumentationIndex() {
                                     />
                                     <Queue
                                         name="Today"
-                                        text="Follow-ups due on the current Karachi date."
+                                        text="Follow-ups due on the signed-in browser's local date."
                                     />
                                     <Queue
                                         name="Next 3 days"
@@ -485,7 +585,7 @@ export default function DocumentationIndex() {
                                     </div>
                                     <ul className="mt-4 space-y-3">
                                         <CheckItem text="Filter by campus, status, employee, and updated date range." />
-                                        <CheckItem text="Today Report uses the current Asia/Karachi date." />
+                                        <CheckItem text="Today Report uses the signed-in browser's local date." />
                                         <CheckItem text="Preview totals and non-zero status counts before download." />
                                         <CheckItem text="PDF uses the Aurea Education branded report format." />
                                     </ul>
@@ -522,12 +622,12 @@ export default function DocumentationIndex() {
                                 <InfoPanel
                                     icon={UsersRound}
                                     title="Employees"
-                                    text="Super Admin maintains profile details, role, permissions, department, designation, campus, and contact information."
+                                    text="Super Admin maintains profile details, role, permissions, department, contact information, and campus access for every employee."
                                 />
                                 <InfoPanel
                                     icon={Building2}
                                     title="Campuses"
-                                    text="Create, edit, search, and toggle visibility. Turning a campus off hides its inquiries without deleting history."
+                                    text="Create, edit, search, and toggle visibility. Turning a campus off hides its inquiries without deleting history; access assignments remain available when re-enabled."
                                 />
                                 <InfoPanel
                                     icon={GraduationCap}
@@ -557,8 +657,8 @@ export default function DocumentationIndex() {
                                     <HostStep
                                         number={1}
                                         title="Build the project before upload"
-                                        text="Run composer install for production dependencies and npm run build so the Vite assets are available in public/build."
-                                        command="composer install --no-dev --optimize-autoloader && npm install && npm run build"
+                                        text="Build the frontend on your local computer, then upload the generated public/build directory. Shared hosting commonly does not provide npm."
+                                        command="npm ci && npm run build"
                                     />
                                     <HostStep
                                         number={2}
@@ -574,9 +674,9 @@ export default function DocumentationIndex() {
                                     />
                                     <HostStep
                                         number={4}
-                                        title="Run Laravel server commands"
-                                        text="Run migrations, create the storage link, and rebuild Laravel caches after the final .env file is ready."
-                                        command="php artisan migrate --force && php artisan storage:link && php artisan optimize"
+                                        title="Install PHP dependencies and finish setup"
+                                        text="On the server, install production PHP dependencies, run migrations, create the storage link, and rebuild Laravel caches after the final .env file is ready."
+                                        command="composer install --no-dev --optimize-autoloader && php artisan migrate --force && php artisan storage:link && php artisan optimize"
                                     />
                                 </div>
                                 <div className="space-y-3">
@@ -692,6 +792,30 @@ function SectionTitle({
                 <h2 className="mt-1 text-xl font-semibold">{title}</h2>
                 <p className="mt-1 max-w-4xl text-sm leading-6 text-muted-foreground">
                     {description}
+                </p>
+            </div>
+        </div>
+    );
+}
+
+function GuideSignal({
+    icon: Icon,
+    title,
+    text,
+}: {
+    icon: typeof ShieldCheck;
+    title: string;
+    text: string;
+}) {
+    return (
+        <div className="flex items-start gap-3 border-b p-4 last:border-b-0 sm:border-r sm:border-b-0 sm:last:border-r-0">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Icon className="size-4" />
+            </span>
+            <div>
+                <div className="text-sm font-semibold">{title}</div>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                    {text}
                 </p>
             </div>
         </div>

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\UserPermission;
 use App\Enums\UserRole;
+use App\Models\Campus;
 use App\Models\User;
 use App\Support\InquiryOptions;
 use Illuminate\Http\RedirectResponse;
@@ -17,10 +18,11 @@ class UserController extends Controller
     // The index method retrieves and displays a list of users along with their roles and permissions, ensuring that only users with the appropriate permissions can access this information, and provides the necessary data for rendering the user management interface on the frontend.
     public function index(Request $request): Response
     {
-        abort_unless($request->user()->hasPermission(UserPermission::ManageUsers), 403);
+        abort_unless($request->user()->role === UserRole::SuperAdmin, 403);
 
         return Inertia::render('users/index', [
             'users' => User::query()
+                ->with('campuses:id')
                 ->orderBy('name')
                 ->get()
                 ->map(fn (User $user) => [
@@ -31,6 +33,7 @@ class UserController extends Controller
                     'role_label' => ($user->role ?? UserRole::User)->label(),
                     'department' => $user->department,
                     'permissions' => $user->permissionValues(),
+                    'campus_ids' => $user->campuses->pluck('id')->values(),
                 ]),
             'roles' => UserRole::options(),
             'departments' => InquiryOptions::DEPARTMENTS,
@@ -40,19 +43,24 @@ class UserController extends Controller
                     'label' => $permission->label(),
                 ])
                 ->values(),
+            'campuses' => Campus::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'is_active']),
         ]);
     }
 
     // The update method handles the updating of a user's role and permissions, ensuring that only users with the appropriate permissions can modify user information, and that the updates are validated before being applied to the database.
     public function update(Request $request, User $user): RedirectResponse
     {
-        abort_unless($request->user()->hasPermission(UserPermission::ManageUsers), 403);
+        abort_unless($request->user()->role === UserRole::SuperAdmin, 403);
 
         $validated = $request->validate([
             'role' => ['required', Rule::enum(UserRole::class)],
             'department' => ['required', Rule::in(InquiryOptions::DEPARTMENTS)],
             'permissions' => ['array'],
             'permissions.*' => ['string', Rule::enum(UserPermission::class)],
+            'campus_ids' => ['array'],
+            'campus_ids.*' => ['integer', 'exists:campuses,id'],
         ]);
 
         $user->update([
@@ -61,6 +69,9 @@ class UserController extends Controller
             'permissions' => $validated['permissions'] ?? [],
         ]);
 
-        return back()->with('success', 'User permissions updated.');
+        // Super Admin remains unrestricted; campus assignments apply to all other roles.
+        $user->campuses()->sync($validated['campus_ids'] ?? []);
+
+        return back()->with('success', 'User access and permissions updated.');
     }
 }

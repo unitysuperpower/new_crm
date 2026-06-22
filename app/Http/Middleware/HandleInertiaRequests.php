@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Enums\UserPermission;
+use App\Enums\UserRole;
 use App\Models\Campus;
 use Illuminate\Http\Request;
 use Inertia\Middleware;
@@ -56,6 +57,10 @@ class HandleInertiaRequests extends Middleware
             ],
             'campusVisibility' => $user?->hasPermission(UserPermission::ToggleCampusVisibility)
                 ? Campus::query()
+                    ->when(
+                        $user->role !== UserRole::SuperAdmin,
+                        fn ($query) => $query->whereIn('id', $user->campuses()->select('campuses.id')),
+                    )
                     ->orderBy('name')
                     ->get(['id', 'name', 'is_active'])
                     ->map(fn (Campus $campus) => [

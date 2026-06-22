@@ -32,16 +32,22 @@ class InquiryController extends Controller
     public function index(Request $request): Response
     {
         Gate::authorize('viewAny', Inquiry::class);
+        $user = $request->user();
 
         $filters = $request->validate([
             'search' => ['nullable', 'string', 'max:255'],
-            'status' => ['nullable', Rule::in(InquiryOptions::STATUSES)],
-            'department' => ['nullable', Rule::in(InquiryOptions::DEPARTMENTS)],
-            'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
-            'source' => ['nullable', 'string', 'max:255'],
-            'program_id' => ['nullable', 'integer', 'exists:programs,id'],
-            'campus_id' => [
-                'nullable',
+            'status' => ['nullable', 'array'],
+            'status.*' => [Rule::in(InquiryOptions::STATUSES)],
+            'department' => ['nullable', 'array'],
+            'department.*' => [Rule::in(InquiryOptions::DEPARTMENTS)],
+            'assigned_user_id' => ['nullable', 'array'],
+            'assigned_user_id.*' => ['integer', 'exists:users,id'],
+            'source' => ['nullable', 'array'],
+            'source.*' => ['string', 'max:255'],
+            'program_id' => ['nullable', 'array'],
+            'program_id.*' => ['integer', 'exists:programs,id'],
+            'campus_id' => ['nullable', 'array'],
+            'campus_id.*' => [
                 'integer',
                 Rule::exists('campuses', 'id')->where('is_active', true),
             ],
@@ -68,15 +74,15 @@ class InquiryController extends Controller
                         ->orWhereHas('campusModel', fn ($campusQuery) => $campusQuery->where('name', 'like', "%{$search}%"));
                 });
             })
-            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
-            ->when($filters['department'] ?? null, fn ($query, string $department) => $query->where('department', $department))
+            ->when($filters['status'] ?? null, fn ($query, array $statuses) => $query->whereIn('status', $statuses))
+            ->when($filters['department'] ?? null, fn ($query, array $departments) => $query->whereIn('department', $departments))
             ->when(
                 ! $isInquiryPage && ($filters['assigned_user_id'] ?? null),
-                fn ($query) => $query->where('assigned_user_id', $filters['assigned_user_id']),
+                fn ($query) => $query->whereIn('assigned_user_id', $filters['assigned_user_id']),
             )
-            ->when($filters['source'] ?? null, fn ($query, string $source) => $query->where('source', $source))
-            ->when($filters['program_id'] ?? null, fn ($query, int $programId) => $query->where('program_id', $programId))
-            ->when($filters['campus_id'] ?? null, fn ($query, int $campusId) => $query->where('campus_id', $campusId))
+            ->when($filters['source'] ?? null, fn ($query, array $sources) => $query->whereIn('source', $sources))
+            ->when($filters['program_id'] ?? null, fn ($query, array $programIds) => $query->whereIn('program_id', $programIds))
+            ->when($filters['campus_id'] ?? null, fn ($query, array $campusIds) => $query->whereIn('campus_id', $campusIds))
             ->when($filters['date_from'] ?? null, fn ($query, string $dateFrom) => $query->whereDate('created_at', '>=', $dateFrom))
             ->when($filters['date_to'] ?? null, fn ($query, string $dateTo) => $query->whereDate('created_at', '<=', $dateTo));
 
@@ -98,12 +104,12 @@ class InquiryController extends Controller
             'pageMode' => $isInquiryPage ? 'assigned' : 'all',
             'filters' => [
                 'search' => $filters['search'] ?? '',
-                'status' => $filters['status'] ?? '',
-                'department' => $filters['department'] ?? '',
-                'assigned_user_id' => $isInquiryPage ? '' : ($filters['assigned_user_id'] ?? ''),
-                'source' => $filters['source'] ?? '',
-                'program_id' => $filters['program_id'] ?? '',
-                'campus_id' => $filters['campus_id'] ?? '',
+                'status' => $filters['status'] ?? [],
+                'department' => $filters['department'] ?? [],
+                'assigned_user_id' => $isInquiryPage ? [] : ($filters['assigned_user_id'] ?? []),
+                'source' => $filters['source'] ?? [],
+                'program_id' => $filters['program_id'] ?? [],
+                'campus_id' => $filters['campus_id'] ?? [],
                 'date_from' => $filters['date_from'] ?? '',
                 'date_to' => $filters['date_to'] ?? '',
                 'queue' => $queue,
@@ -122,6 +128,10 @@ class InquiryController extends Controller
             ],
             'programs' => Program::query()
                 ->with('campus:id,name')
+                ->when(
+                    $user->role !== UserRole::SuperAdmin,
+                    fn (Builder $query) => $query->whereIn('campus_id', $user->campuses()->select('campuses.id')),
+                )
                 ->orderBy('name')
                 ->get(['id', 'campus_id', 'name', 'duration'])
                 ->map(fn (Program $program) => [
@@ -131,15 +141,12 @@ class InquiryController extends Controller
                     'duration' => $program->duration,
                     'campus' => $program->campus?->only(['id', 'name']),
                 ]),
-            'campuses' => Campus::query()
+            'campuses' => $this->accessibleCampusQuery($user)
+                ->where('is_active', true)
                 ->orderBy('name')
                 ->get(['id', 'name', 'is_active']),
             'teamMembers' => User::query()->orderBy('name')->get(['id', 'name', 'department']),
-            'sourceOptions' => Inquiry::query()
-                ->where(function ($query) {
-                    $query->whereNull('campus_id')
-                        ->orWhereHas('campusModel', fn ($campusQuery) => $campusQuery->where('is_active', true));
-                })
+            'sourceOptions' => $this->visibleInquiryQuery($request, false)
                 ->whereNotNull('source')
                 ->distinct()
                 ->orderBy('source')
@@ -173,9 +180,18 @@ class InquiryController extends Controller
         Gate::authorize('create', Inquiry::class);
 
         $data = $request->validated();
+        abort_unless($request->user()->canAccessCampus($data['campus_id'] ?? null), 403);
         if ($request->user()->role !== UserRole::SuperAdmin) {
             $data['assigned_user_id'] = $request->user()->id;
             $data['department'] = $request->user()->department;
+        }
+
+        $assignee = User::findOrFail($data['assigned_user_id']);
+
+        if (! $assignee->canAccessCampus($data['campus_id'] ?? null)) {
+            return back()->withErrors([
+                'assigned_user_id' => 'Give the selected employee access to this campus before assigning the inquiry.',
+            ]);
         }
 
         if (! empty($data['assigned_user_id'])) {
@@ -332,7 +348,7 @@ class InquiryController extends Controller
         $storedPath = $this->storeInquiryImportFile($request);
 
         try {
-            DB::transaction(function () use ($rowsToImport) {
+            DB::transaction(function () use ($rowsToImport, $request) {
                 foreach ($rowsToImport as $row) {
                     if (empty($row['campus_id']) && ! empty($row['campus'])) {
                         $row['campus_id'] = Campus::query()
@@ -342,6 +358,7 @@ class InquiryController extends Controller
                     }
 
                     $row['program_id'] = $this->resolveImportProgramId($row);
+                    abort_unless($request->user()->canAccessCampus($row['campus_id'] ?? null), 403);
 
                     unset(
                         $row['program'],
@@ -492,6 +509,17 @@ class InquiryController extends Controller
         ]);
 
         $assignee = User::findOrFail($validated['assigned_user_id']);
+        $inaccessibleCampusExists = Inquiry::query()
+            ->whereIn('id', $validated['inquiry_ids'])
+            ->whereNotNull('campus_id')
+            ->whereNotIn('campus_id', $assignee->campuses()->select('campuses.id'))
+            ->exists();
+
+        if ($assignee->role !== UserRole::SuperAdmin && $inaccessibleCampusExists) {
+            return back()->withErrors([
+                'assigned_user_id' => 'Give the selected employee access to every inquiry campus before assigning them.',
+            ]);
+        }
 
         Inquiry::query()
             ->whereIn('id', $validated['inquiry_ids'])
@@ -508,6 +536,7 @@ class InquiryController extends Controller
     // The saveActivity method allows authorized users to add a new activity stream entry for a specific inquiry, optionally updating the inquiry's details and status, and ensuring that all changes are recorded in a single transaction for data integrity and consistency.
     public function saveActivity(SaveInquiryActivityRequest $request, Inquiry $inquiry): RedirectResponse
     {
+        Gate::authorize('view', $inquiry);
         $validated = $request->validated();
         $canUpdate = $request->user()->can('update', $inquiry);
         $response = trim($validated['response'] ?? '');
@@ -530,6 +559,8 @@ class InquiryController extends Controller
                     'postal_communication' => $validated['postal_communication'],
                     'next_follow_up_at' => $validated['next_follow_up_at'] ?? null,
                 ];
+
+                abort_unless($request->user()->canAccessCampus($updates['campus_id']), 403);
 
                 $inquiry->update($updates);
             }
@@ -599,7 +630,9 @@ class InquiryController extends Controller
     // The visibleInquiryQuery method constructs a base query for retrieving inquiries that are visible to the current user, applying filters based on campus activity and assignment status, ensuring that users only see inquiries they are authorized to access.
     private function visibleInquiryQuery(Request $request, bool $assignedOnly): Builder
     {
-        return Inquiry::query()
+        $user = $request->user();
+
+        return $this->applyCampusAccess(Inquiry::query(), $user)
             ->where(function (Builder $query): void {
                 $query->whereNull('campus_id')
                     ->orWhereHas('campusModel', fn (Builder $campusQuery) => $campusQuery->where('is_active', true));
@@ -700,10 +733,14 @@ class InquiryController extends Controller
     private function validateReportFilters(Request $request): array
     {
         return $request->validate([
-            'campus_id' => ['nullable', 'integer', 'exists:campuses,id'],
-            'program_id' => ['nullable', 'integer', 'exists:programs,id'],
-            'status' => ['nullable', Rule::in(InquiryOptions::STATUSES)],
-            'assigned_user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'campus_id' => ['nullable', 'array'],
+            'campus_id.*' => ['integer', 'exists:campuses,id'],
+            'program_id' => ['nullable', 'array'],
+            'program_id.*' => ['integer', 'exists:programs,id'],
+            'status' => ['nullable', 'array'],
+            'status.*' => [Rule::in(InquiryOptions::STATUSES)],
+            'assigned_user_id' => ['nullable', 'array'],
+            'assigned_user_id.*' => ['integer', 'exists:users,id'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
@@ -714,7 +751,7 @@ class InquiryController extends Controller
     {
         $canSelectUser = $request->user()->can('assign', Inquiry::class);
 
-        return Inquiry::query()
+        return $this->applyCampusAccess(Inquiry::query(), $request->user())
             ->with(['program:id,name,campus_id,duration', 'campusModel:id,name', 'assignedUser:id,name'])
             ->whereNotNull('assigned_user_id')
             ->where(function (Builder $query) {
@@ -725,16 +762,44 @@ class InquiryController extends Controller
                 $canSelectUser,
                 fn (Builder $query) => $query->when(
                     $filters['assigned_user_id'] ?? null,
-                    fn (Builder $inner, int $userId) => $inner->where('assigned_user_id', $userId),
+                    fn (Builder $inner, array $userIds) => $inner->whereIn('assigned_user_id', $userIds),
                 ),
                 fn (Builder $query) => $query->where('assigned_user_id', $request->user()->id),
             )
-            ->when($filters['campus_id'] ?? null, fn (Builder $query, int $campusId) => $query->where('campus_id', $campusId))
-            ->when($filters['program_id'] ?? null, fn (Builder $query, int $programId) => $query->where('program_id', $programId))
-            ->when($filters['status'] ?? null, fn (Builder $query, string $status) => $query->where('status', $status))
+            ->when($filters['campus_id'] ?? null, fn (Builder $query, array $campusIds) => $query->whereIn('campus_id', $campusIds))
+            ->when($filters['program_id'] ?? null, fn (Builder $query, array $programIds) => $query->whereIn('program_id', $programIds))
+            ->when($filters['status'] ?? null, fn (Builder $query, array $statuses) => $query->whereIn('status', $statuses))
             ->when($filters['date_from'] ?? null, fn (Builder $query, string $date) => $query->whereDate('updated_at', '>=', $date))
             ->when($filters['date_to'] ?? null, fn (Builder $query, string $date) => $query->whereDate('updated_at', '<=', $date))
             ->latest('updated_at');
+    }
+
+    private function applyCampusAccess(Builder $query, User $user): Builder
+    {
+        if ($user->role === UserRole::SuperAdmin) {
+            return $query;
+        }
+
+        return $query->where(function (Builder $campusQuery) use ($user): void {
+            $campusQuery->whereNull('campus_id')
+                ->orWhereIn('campus_id', $user->campuses()->select('campuses.id'));
+        });
+    }
+
+    private function accessibleCampusQuery(User $user): Builder
+    {
+        return $user->role === UserRole::SuperAdmin
+            ? Campus::query()
+            : Campus::query()->whereIn('id', $user->campuses()->select('campuses.id'));
+    }
+
+    private function filterNames(string $model, array $ids): ?string
+    {
+        if ($ids === []) {
+            return null;
+        }
+
+        return $model::query()->whereIn('id', $ids)->orderBy('name')->pluck('name')->implode(', ');
     }
 
     // The reportPayload method prepares the data structure for the inquiry report, including metadata about the report generation time and applied filters, aggregated counts of inquiries by status, and a detailed list of inquiries with their relevant attributes, ensuring that the report contains comprehensive information for analysis and presentation in both JSON and PDF formats.
@@ -743,10 +808,10 @@ class InquiryController extends Controller
         return [
             'generatedAt' => now()->format('M d, Y h:i A'),
             'filters' => [
-                'campus' => isset($filters['campus_id']) ? Campus::find($filters['campus_id'])?->name : null,
-                'program' => isset($filters['program_id']) ? Program::find($filters['program_id'])?->name : null,
-                'status' => $filters['status'] ?? null,
-                'user' => isset($filters['assigned_user_id']) ? User::find($filters['assigned_user_id'])?->name : null,
+                'campus' => $this->filterNames(Campus::class, $filters['campus_id'] ?? []),
+                'program' => $this->filterNames(Program::class, $filters['program_id'] ?? []),
+                'status' => ($filters['status'] ?? []) === [] ? null : implode(', ', $filters['status']),
+                'user' => $this->filterNames(User::class, $filters['assigned_user_id'] ?? []),
                 'dateFrom' => $filters['date_from'] ?? null,
                 'dateTo' => $filters['date_to'] ?? null,
             ],

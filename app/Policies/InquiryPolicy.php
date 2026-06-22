@@ -22,7 +22,8 @@ class InquiryPolicy
      */
     public function view(User $user, Inquiry $inquiry): bool
     {
-        return $user->hasPermission(UserPermission::ViewInquiry);
+        return $user->hasPermission(UserPermission::ViewInquiry)
+            && $user->canAccessCampus($inquiry->campus_id);
     }
 
     /**
@@ -48,6 +49,10 @@ class InquiryPolicy
      */
     public function update(User $user, Inquiry $inquiry): bool
     {
+        if (! $user->canAccessCampus($inquiry->campus_id)) {
+            return false;
+        }
+
         if ($user->hasPermission(UserPermission::ManageInquiry)) {
             return true;
         }
@@ -58,7 +63,8 @@ class InquiryPolicy
 
     public function createStream(User $user, Inquiry $inquiry): bool
     {
-        return $user->hasPermission(UserPermission::CreateInquiryStream);
+        return $user->hasPermission(UserPermission::CreateInquiryStream)
+            && $user->canAccessCampus($inquiry->campus_id);
     }
 
     /**

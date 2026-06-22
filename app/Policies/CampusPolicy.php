@@ -30,7 +30,8 @@ class CampusPolicy
 
     public function toggleVisibility(User $user, Campus $campus): bool
     {
-        return $user->hasPermission(UserPermission::ToggleCampusVisibility);
+        return $user->hasPermission(UserPermission::ToggleCampusVisibility)
+            && $user->canAccessCampus($campus->id);
     }
 
     public function delete(User $user, Campus $campus): bool

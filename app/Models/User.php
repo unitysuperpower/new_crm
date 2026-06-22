@@ -8,6 +8,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\Contracts\PasskeyUser;
@@ -113,5 +114,28 @@ class User extends Authenticatable implements PasskeyUser
     public function streams()
     {
         return $this->hasMany(Stream::class, 'user_id');
+    }
+
+    public function campuses(): BelongsToMany
+    {
+        return $this->belongsToMany(Campus::class)->withTimestamps();
+    }
+
+    public function canAccessCampus(?int $campusId): bool
+    {
+        if ($this->role === UserRole::SuperAdmin) {
+            return true;
+        }
+
+        if (! $campusId) {
+            // Older inquiries without a campus remain visible until they are classified.
+            return true;
+        }
+
+        if ($this->relationLoaded('campuses')) {
+            return $this->campuses->contains('id', $campusId);
+        }
+
+        return $this->campuses()->whereKey($campusId)->exists();
     }
 }
