@@ -157,6 +157,9 @@ type ReportInquiry = {
     status: string;
     department: string;
     updated_at: string;
+    latest_comment: string | null;
+    latest_comment_user: string | null;
+    latest_comment_at: string | null;
 };
 
 // The inquiry report type represents the structure of the data returned when generating an inquiry report. It includes metadata about the report generation, the applied filters, counts of inquiries by status, and a list of inquiries that match the report criteria.
@@ -1619,27 +1622,28 @@ export default function Dashboard({
                                 </span>
                             </div>
                             <div className="relative max-h-[55vh] overflow-auto rounded-md border">
-                                <table className="w-full min-w-[1050px] text-sm">
+                                <table className="w-full min-w-[1190px] text-sm">
                                     <thead className="sticky top-0 z-10 bg-muted text-muted-foreground shadow-[inset_0_-1px_0_var(--border)]">
                                         <tr>
-                                            <Th>ID</Th>
+                                            <Th>S.No.</Th>
                                             <Th>Student</Th>
                                             <Th>Program</Th>
                                             <Th>Campus</Th>
                                             <Th>Assigned user</Th>
                                             <Th>Status</Th>
                                             <Th>Department</Th>
+                                            <Th>Latest discussion</Th>
                                             <Th>Last updated</Th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {report.inquiries.map((inquiry) => (
+                                        {report.inquiries.map((inquiry, index) => (
                                             <tr
                                                 key={inquiry.id}
                                                 className="border-t transition-colors hover:bg-muted/35"
                                             >
                                                 <Td className="font-mono text-xs text-muted-foreground">
-                                                    #{inquiry.id}
+                                                    {index + 1}
                                                 </Td>
                                                 <Td className="min-w-52">
                                                     <div className="font-semibold text-foreground">
@@ -1676,6 +1680,27 @@ export default function Dashboard({
                                                         {inquiry.department}
                                                     </span>
                                                 </Td>
+                                                <Td className="min-w-72">
+                                                    {inquiry.latest_comment ? (
+                                                        <div>
+                                                            <p className="line-clamp-2 text-sm leading-5">
+                                                                {
+                                                                    inquiry.latest_comment
+                                                                }
+                                                            </p>
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                {inquiry.latest_comment_user ??
+                                                                    'Employee'}
+                                                                {inquiry.latest_comment_at &&
+                                                                    ` | ${inquiry.latest_comment_at}`}
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            No discussion yet
+                                                        </span>
+                                                    )}
+                                                </Td>
                                                 <Td className="whitespace-nowrap text-muted-foreground">
                                                     {inquiry.updated_at}
                                                 </Td>
@@ -1685,7 +1710,7 @@ export default function Dashboard({
                                             <tr>
                                                 <td
                                                     className="p-12 text-center text-muted-foreground"
-                                                    colSpan={8}
+                                                    colSpan={9}
                                                 >
                                                     No inquiries match these
                                                     report filters.

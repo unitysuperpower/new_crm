@@ -6,6 +6,7 @@ use Database\Factories\InquiryFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Inquiry extends Model
@@ -61,5 +62,10 @@ class Inquiry extends Model
     public function streams(): HasMany
     {
         return $this->hasMany(Stream::class)->latest();
+    }
+
+    public function latestStream(): HasOne
+    {
+        return $this->hasOne(Stream::class)->latestOfMany('created_at');
     }
 }

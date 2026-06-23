@@ -752,7 +752,12 @@ class InquiryController extends Controller
         $canSelectUser = $request->user()->can('assign', Inquiry::class);
 
         return $this->applyCampusAccess(Inquiry::query(), $request->user())
-            ->with(['program:id,name,campus_id,duration', 'campusModel:id,name', 'assignedUser:id,name'])
+            ->with([
+                'program:id,name,campus_id,duration',
+                'campusModel:id,name',
+                'assignedUser:id,name',
+                'latestStream.user:id,name',
+            ])
             ->whereNotNull('assigned_user_id')
             ->where(function (Builder $query) {
                 $query->whereNull('campus_id')
@@ -832,6 +837,9 @@ class InquiryController extends Controller
                 'status' => $inquiry->status,
                 'department' => $inquiry->department,
                 'updated_at' => $inquiry->updated_at?->format('M d, Y h:i A'),
+                'latest_comment' => $inquiry->latestStream?->response,
+                'latest_comment_user' => $inquiry->latestStream?->user?->name,
+                'latest_comment_at' => $inquiry->latestStream?->created_at?->format('M d, Y h:i A'),
             ])->values(),
         ];
     }

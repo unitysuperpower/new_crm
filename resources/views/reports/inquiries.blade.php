@@ -67,12 +67,12 @@
 
     <table class="report-table">
         <colgroup>
-            <col style="width:4%"><col style="width:14%"><col style="width:15%"><col style="width:12%"><col style="width:11%">
-            <col style="width:12%"><col style="width:10%"><col style="width:9%"><col style="width:13%">
+            <col style="width:4%"><col style="width:12%"><col style="width:12%"><col style="width:11%"><col style="width:9%">
+            <col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:16%"><col style="width:10%">
         </colgroup>
         <thead>
             <tr>
-                {{-- <th>#</th> --}}
+                <th>S.No.</th>
                 <th>Student</th>
                 <th>Contact</th>
                 <th>Program</th>
@@ -80,13 +80,14 @@
                 <th>Assigned user</th>
                 <th>Status</th>
                 <th>Department</th>
+                <th>Latest discussion</th>
                 <th>Last updated</th>
             </tr>
         </thead>
         <tbody>
             @forelse ($inquiries as $inquiry)
                 <tr>
-                    {{-- <td>{{ $inquiry['id'] }}</td> --}}
+                    <td>{{ $loop->iteration }}</td>
                     <td class="student">{{ $inquiry['name'] }}</td>
                     <td>{{ $inquiry['phone'] }}<br><span class="muted">{{ $inquiry['email'] ?: 'No email' }}</span></td>
                     <td>{{ $inquiry['program'] ?? 'Not set' }}</td>
@@ -94,10 +95,16 @@
                     <td>{{ $inquiry['assigned_user'] ?? 'Unassigned' }}</td>
                     <td>{{ ucfirst($inquiry['status']) }}</td>
                     <td>{{ ucfirst($inquiry['department']) }}</td>
+                    <td>
+                        {{ $inquiry['latest_comment'] ?? 'No discussion yet' }}
+                        @if ($inquiry['latest_comment_at'])
+                            <br><span class="muted">{{ $inquiry['latest_comment_user'] ?? 'Employee' }} · {{ $inquiry['latest_comment_at'] }}</span>
+                        @endif
+                    </td>
                     <td>{{ $inquiry['updated_at'] }}</td>
                 </tr>
             @empty
-                <tr><td class="empty" colspan="9">No inquiries match the selected report filters.</td></tr>
+                <tr><td class="empty" colspan="10">No inquiries match the selected report filters.</td></tr>
             @endforelse
         </tbody>
     </table>

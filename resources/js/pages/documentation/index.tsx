@@ -561,6 +561,7 @@ export default function DocumentationIndex() {
                                     <CheckRow text="All shows the complete timeline; employee tabs filter by contributor." />
                                     <CheckRow text="Every stream records the employee, response, timestamp, and status at that time." />
                                     <CheckRow text="Employees with stream permission may add discussion even when they cannot edit details." />
+                                    <CheckRow text="To update the latest report comment, open the inquiry, write the new note in Discussion stream at the bottom, then select Update inquiry and stream or Submit stream." />
                                 </div>
                             </div>
                         </section>
@@ -587,6 +588,7 @@ export default function DocumentationIndex() {
                                         <CheckItem text="Filter by campus, status, employee, and updated date range." />
                                         <CheckItem text="Today Report uses the signed-in browser's local date." />
                                         <CheckItem text="Preview totals and non-zero status counts before download." />
+                                        <CheckItem text="Each report row includes the latest discussion note, employee, and discussion time." />
                                         <CheckItem text="PDF uses the Aurea Education branded report format." />
                                     </ul>
                                 </div>
