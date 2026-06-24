@@ -34,6 +34,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('inquiries/report', [InquiryController::class, 'report'])->name('inquiries.report');
     Route::get('inquiries/report/pdf', [InquiryController::class, 'reportPdf'])->name('inquiries.report.pdf');
     Route::get('inquiries/{inquiry}/invitation-letter.pdf', [InquiryController::class, 'invitationLetter'])->name('inquiries.invitation-letter');
+    Route::get('inquiries/{inquiry}/scholarship-letter.pdf', [InquiryController::class, 'scholarshipLetter'])->name('inquiries.scholarship-letter');
     Route::get('programs', [ProgramController::class, 'index'])->name('programs.index');
     Route::post('programs', [ProgramController::class, 'store'])->name('programs.store');
     Route::patch('programs/{program}', [ProgramController::class, 'update'])->name('programs.update');

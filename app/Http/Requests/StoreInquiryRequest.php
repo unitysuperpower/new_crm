@@ -8,6 +8,7 @@ use App\Support\InquiryOptions;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 class StoreInquiryRequest extends FormRequest
 {
@@ -27,6 +28,38 @@ class StoreInquiryRequest extends FormRequest
     public function authorize(): bool
     {
         return $this->user()?->can('create', Inquiry::class) ?? false;
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if (! $validator->errors()->has('phone')) {
+                $phone = $this->normalizePhone($this->input('phone'));
+                $phoneAlreadyExists = $phone !== '' && Inquiry::query()
+                    ->pluck('phone')
+                    ->contains(fn (string $value): bool => $this->normalizePhone($value) === $phone);
+
+                if ($phoneAlreadyExists) {
+                    $validator->errors()->add(
+                        'phone',
+                        'An inquiry already exists with this phone number. Search for the student record instead of creating a duplicate.',
+                    );
+                }
+            }
+
+            if (! $validator->errors()->has('email')) {
+                $email = $this->normalizeEmail($this->input('email'));
+
+                if ($email !== '' && Inquiry::query()
+                    ->whereRaw('LOWER(email) = ?', [$email])
+                    ->exists()) {
+                    $validator->errors()->add(
+                        'email',
+                        'An inquiry already exists with this email address. Search for the student record instead of creating a duplicate.',
+                    );
+                }
+            }
+        });
     }
 
     /**
@@ -56,5 +89,15 @@ class StoreInquiryRequest extends FormRequest
             'next_follow_up_at' => ['nullable', 'date'],
             'message' => ['nullable', 'string', 'max:5000'],
         ];
+    }
+
+    private function normalizePhone(?string $phone): string
+    {
+        return preg_replace('/\D+/', '', $phone ?? '') ?? '';
+    }
+
+    private function normalizeEmail(?string $email): string
+    {
+        return mb_strtolower(trim($email ?? ''));
     }
 }

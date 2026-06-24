@@ -277,6 +277,39 @@ class InquiryController extends Controller
         ]);
     }
 
+    public function scholarshipLetter(Request $request, Inquiry $inquiry): HttpResponse
+    {
+        Gate::authorize('view', $inquiry);
+        abort_unless((float) $inquiry->scholarship_percentage > 0, 404);
+
+        $inquiry->loadMissing(['program:id,name,campus_id,duration', 'campusModel:id,name']);
+        $logoPath = public_path('logo.jpeg');
+        $logoData = file_exists($logoPath)
+            ? 'data:image/jpeg;base64,'.base64_encode(file_get_contents($logoPath))
+            : null;
+
+        $options = new Options;
+        $options->set('defaultFont', 'DejaVu Sans');
+
+        $pdf = new Dompdf($options);
+        $pdf->loadHtml(view('letters.inquiry-scholarship', [
+            'inquiry' => $inquiry,
+            'logoData' => $logoData,
+            'programName' => $inquiry->program?->name ?? 'the selected academic program',
+            'campusName' => $inquiry->campusModel?->name ?? $inquiry->campus ?? 'Aurea Education',
+            'scholarshipPercentage' => $inquiry->scholarship_percentage,
+        ])->render());
+        $pdf->setPaper('a4', 'portrait');
+        $pdf->render();
+
+        $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '-', $inquiry->name) ?: 'student';
+
+        return response($pdf->output(), 200, [
+            'Content-Disposition' => 'attachment; filename="scholarship-letter-'.$safeName.'.pdf"',
+            'Content-Type' => 'application/pdf',
+        ]);
+    }
+
     // The import method allows authorized users to bulk import multiple inquiries at once, significantly reducing the time and effort required to add large volumes of inquiries into the system, especially when migrating from another platform or onboarding a new batch of leads.
     public function import(Request $request): RedirectResponse
     {
@@ -557,6 +590,7 @@ class InquiryController extends Controller
                     'status' => $validated['status'],
                     'department' => $validated['department'],
                     'postal_communication' => $validated['postal_communication'],
+                    'scholarship_percentage' => $validated['scholarship_percentage'] ?? null,
                     'next_follow_up_at' => $validated['next_follow_up_at'] ?? null,
                 ];
 
@@ -610,6 +644,7 @@ class InquiryController extends Controller
             'assigned_user' => $inquiry->assignedUser?->only(['id', 'name']),
             'department' => $inquiry->department,
             'postal_communication' => $inquiry->postal_communication,
+            'scholarship_percentage' => $inquiry->scholarship_percentage,
             'next_follow_up_at' => $inquiry->next_follow_up_at?->format('Y-m-d'),
             'assigned_at' => $inquiry->assigned_at?->format('M d, Y h:i A'),
             'last_activity_at' => $inquiry->last_activity_at?->format('M d, Y h:i A'),

@@ -437,7 +437,7 @@
     "name": "wayfinder"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CxDOgV5o.css",
+    "file": "assets/app-CVSfStIb.css",
     "name": "app",
     "names": [
       "app.css"
@@ -446,7 +446,7 @@
     "isEntry": true
   },
   "resources/js/app.tsx": {
-    "file": "assets/app-Cx0YB9XW.js",
+    "file": "assets/app-Bzcrg9od.js",
     "name": "app",
     "src": "resources/js/app.tsx",
     "isEntry": true,
@@ -610,7 +610,7 @@
     ]
   },
   "resources/js/pages/dashboard.tsx": {
-    "file": "assets/dashboard-BvkE_E8f.js",
+    "file": "assets/dashboard-DpGhHAkr.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.tsx",
     "isEntry": true,
@@ -635,7 +635,7 @@
     ]
   },
   "resources/js/pages/documentation/index.tsx": {
-    "file": "assets/index-B0ZULfDq.js",
+    "file": "assets/index-CFqjadbp.js",
     "name": "index",
     "src": "resources/js/pages/documentation/index.tsx",
     "isEntry": true,

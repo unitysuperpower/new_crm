@@ -91,6 +91,7 @@ type Inquiry = {
     assigned_user: Option | null;
     department: string;
     postal_communication: 'pending' | 'created' | 'sent';
+    scholarship_percentage: string | null;
     next_follow_up_at: string | null;
     assigned_at: string | null;
     last_activity_at: string | null;
@@ -538,6 +539,12 @@ export default function Dashboard({
                 setCreateOpen(false);
                 setNewInquiry(createInquiryDefaults);
             },
+            onError: (errors) => {
+                showErrorToast(
+                    Object.values(errors)[0] ??
+                        'The inquiry could not be created. Please review the details and try again.',
+                );
+            },
         });
     };
 
@@ -558,6 +565,12 @@ export default function Dashboard({
                     if (csvInputRef.current) {
                         csvInputRef.current.value = '';
                     }
+                },
+                onError: (errors) => {
+                    showErrorToast(
+                        Object.values(errors)[0] ??
+                            'The CSV import could not be completed. Please review the rows and try again.',
+                    );
                 },
             },
         );
@@ -642,6 +655,8 @@ export default function Dashboard({
                       status: selected.status,
                       department: selected.department,
                       postal_communication: selected.postal_communication,
+                      scholarship_percentage:
+                          selected.scholarship_percentage ?? '',
                       next_follow_up_at: selected.next_follow_up_at ?? '',
                       response: streamText,
                   }
@@ -2477,6 +2492,14 @@ function InquiryDetailsFields({
                         })
                     }
                 />
+                <Field
+                    label="Scholarship %"
+                    type="number"
+                    value={inquiry.scholarship_percentage ?? ''}
+                    onChange={(scholarship_percentage) =>
+                        onChange({ ...inquiry, scholarship_percentage })
+                    }
+                />
             </div>
             <div className="grid gap-2">
                 <Label>Address</Label>
@@ -2544,6 +2567,25 @@ function InquiryDetailsSummary({
                             </a>
                         </Button>
                     )}
+                    {canDownloadScholarshipLetter(inquiry) && (
+                        <Button
+                            asChild
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            className="text-primary"
+                            title="Download scholarship letter PDF"
+                        >
+                            <a
+                                href={withLocalTimezone(
+                                    `/inquiries/${inquiry.id}/scholarship-letter.pdf`,
+                                )}
+                                aria-label={`Download scholarship letter for ${inquiry.name}`}
+                            >
+                                <FileDown />
+                            </a>
+                        </Button>
+                    )}
                     {canEdit && (
                         <Button
                             type="button"
@@ -2587,6 +2629,15 @@ function InquiryDetailsSummary({
                 <Info
                     label="Initial message"
                     value={inquiry.message ?? 'Not set'}
+                />
+                <Info label="Inquiry date" value={inquiry.created_at} />
+                <Info
+                    label="Scholarship"
+                    value={
+                        Number(inquiry.scholarship_percentage ?? 0) > 0
+                            ? `${formatScholarshipPercentage(inquiry.scholarship_percentage)}%`
+                            : 'Not offered'
+                    }
                 />
             </div>
         </section>
@@ -3122,6 +3173,18 @@ function LastDiscussion({
 
 function canDownloadInvitationLetter(inquiry: Inquiry): boolean {
     return ['created', 'sent'].includes(inquiry.postal_communication);
+}
+
+function canDownloadScholarshipLetter(inquiry: Inquiry): boolean {
+    return Number(inquiry.scholarship_percentage ?? 0) > 0;
+}
+
+function formatScholarshipPercentage(value: string | null): string {
+    const percentage = Number(value ?? 0);
+
+    return Number.isInteger(percentage)
+        ? String(percentage)
+        : percentage.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function postalCommunicationLabel(value: string): string {

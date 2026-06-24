@@ -31,6 +31,7 @@ class SaveInquiryActivityRequest extends FormRequest
             'status' => $this->input('status', $inquiry->status),
             'department' => $this->input('department', $inquiry->department),
             'postal_communication' => $this->input('postal_communication', $inquiry->postal_communication),
+            'scholarship_percentage' => $this->input('scholarship_percentage', $inquiry->scholarship_percentage),
             'next_follow_up_at' => $this->input('next_follow_up_at', $inquiry->next_follow_up_at?->format('Y-m-d')),
         ]);
     }
@@ -71,6 +72,9 @@ class SaveInquiryActivityRequest extends FormRequest
                 : ['prohibited'],
             'postal_communication' => $canUpdate
                 ? ['required', 'string', Rule::in(InquiryOptions::POSTAL_COMMUNICATIONS)]
+                : ['prohibited'],
+            'scholarship_percentage' => $canUpdate
+                ? ['nullable', 'numeric', 'min:0', 'max:100']
                 : ['prohibited'],
             'next_follow_up_at' => $canUpdate ? ['nullable', 'date'] : ['prohibited'],
             'response' => [

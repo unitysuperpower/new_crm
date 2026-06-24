@@ -151,6 +151,31 @@ class InquiryWorkflowTest extends TestCase
         ]);
     }
 
+    public function test_manual_inquiry_creation_rejects_duplicate_phone_and_email(): void
+    {
+        $user = User::factory()->create();
+        $this->createInquiry([
+            'phone' => '0300-111-2222',
+            'email' => 'existing.student@example.com',
+        ]);
+
+        $this->actingAs($user)
+            ->post(route('inquiries.store'), [
+                'name' => 'Duplicate Student',
+                'phone' => '03001112222',
+                'email' => 'EXISTING.STUDENT@example.com',
+                'status' => 'pending',
+            ])
+            ->assertSessionHasErrors([
+                'phone' => 'An inquiry already exists with this phone number. Search for the student record instead of creating a duplicate.',
+                'email' => 'An inquiry already exists with this email address. Search for the student record instead of creating a duplicate.',
+            ]);
+
+        $this->assertDatabaseMissing('inquiries', [
+            'name' => 'Duplicate Student',
+        ]);
+    }
+
     public function test_unassigned_user_can_only_add_a_stream_through_activity_action(): void
     {
         $assignedUser = User::factory()->create();

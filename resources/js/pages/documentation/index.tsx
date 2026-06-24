@@ -77,11 +77,11 @@ const inquirySteps = [
     ],
     [
         'Review current details',
-        'Status, department, program, campus, assignment, contact details, message, and follow-up date are shown together.',
+        'Status, department, program, campus, assignment, contact details, inquiry date, scholarship, message, and follow-up date are shown together.',
     ],
     [
         'Edit when permitted',
-        'Select the pencil icon. Super Admin, Admin with management permission, or the assigned employee can edit.',
+        'Select the pencil icon. Super Admin, Admin with management permission, or the assigned employee can edit. The inquiry date and scholarship percentage are available only in this detail editor.',
     ],
     [
         'Add the discussion',
@@ -574,7 +574,7 @@ export default function DocumentationIndex() {
                                 icon={FileDown}
                                 eyebrow="Output"
                                 title="Reports and PDF letters"
-                                description="Generate operational reports from assigned inquiries and formal student invitation letters from eligible records."
+                                description="Generate operational reports from assigned inquiries and formal student letters from eligible records."
                             />
                             <div className="grid gap-5 lg:grid-cols-2">
                                 <div className="border p-5">
@@ -605,6 +605,7 @@ export default function DocumentationIndex() {
                                         <CheckItem text="Use the PDF icon in the table or inquiry detail modal." />
                                         <CheckItem text="The letter includes student, contact, program, campus, and address details." />
                                         <CheckItem text="Filename follows student-inquiry-Student-Name.pdf." />
+                                        <CheckItem text="Set a scholarship percentage in the inquiry detail editor to unlock its scholarship letter PDF." />
                                     </ul>
                                 </div>
                             </div>
