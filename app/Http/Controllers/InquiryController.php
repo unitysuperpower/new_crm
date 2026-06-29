@@ -745,6 +745,9 @@ class InquiryController extends Controller
 
         return [
             'total_inquiries' => (clone $workspaceScope)->count(),
+            'all_assigned' => (clone $workspaceScope)
+                ->whereNotNull('assigned_user_id')
+                ->count(),
             'assigned_today' => (clone $workspaceScope)
                 ->whereNotNull('assigned_user_id')
                 ->whereDate('assigned_at', today())

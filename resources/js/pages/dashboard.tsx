@@ -192,6 +192,7 @@ type FilterCounts = {
 // The queue counts type represents the structure of the counts of inquiries in different follow-up queues. It includes the total number of inquiries, the number of inquiries assigned today, and the number of follow-ups scheduled for yesterday, today, and the next 3 days.
 type QueueCounts = {
     total_inquiries: number;
+    all_assigned: number;
     assigned_today: number;
     follow_ups_yesterday: number;
     follow_ups_today: number;
@@ -786,7 +787,7 @@ export default function Dashboard({
                 </div>
 
                 {crmPermissions.canViewDashboardMetrics && (
-                    <div className="grid gap-3 md:grid-cols-4">
+                    <div className="grid gap-3 md:grid-cols-5">
                         <Metric
                             label={
                                 pageMode === 'assigned'
@@ -794,6 +795,10 @@ export default function Dashboard({
                                     : 'All inquiries'
                             }
                             value={queueCounts.total_inquiries}
+                        />
+                        <Metric
+                            label="All assigned"
+                            value={queueCounts.all_assigned}
                         />
                         <Metric
                             label="Assigned today"
