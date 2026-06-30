@@ -121,6 +121,19 @@
       "_button-CLmz_CQO.js"
     ]
   },
+  "_dropdown-menu-BEHcoseA.js": {
+    "file": "assets/dropdown-menu-BEHcoseA.js",
+    "name": "dropdown-menu",
+    "imports": [
+      "_jsx-runtime-CCQbyx1z.js",
+      "_dist-CAdDKkt6.js",
+      "_es2015-om5GQIjf.js",
+      "_button-CLmz_CQO.js",
+      "_utils-BNhDZxi-.js",
+      "_check-B-wgVm1t.js",
+      "_loader-circle-BLInaTD3.js"
+    ]
+  },
   "_es2015-om5GQIjf.js": {
     "file": "assets/es2015-om5GQIjf.js",
     "name": "es2015",
@@ -378,14 +391,6 @@
       "_jsx-runtime-CCQbyx1z.js"
     ]
   },
-  "_use-flash-toast-B4y_Foio.js": {
-    "file": "assets/use-flash-toast-B4y_Foio.js",
-    "name": "use-flash-toast",
-    "imports": [
-      "_jsx-runtime-CCQbyx1z.js",
-      "_loader-circle-BLInaTD3.js"
-    ]
-  },
   "_use-two-factor-auth-yI6wbfIJ.js": {
     "file": "assets/use-two-factor-auth-yI6wbfIJ.js",
     "name": "use-two-factor-auth",
@@ -432,7 +437,7 @@
     "name": "wayfinder"
   },
   "resources/css/app.css": {
-    "file": "assets/app-S_FLj0H8.css",
+    "file": "assets/app-3RUmzEnR.css",
     "name": "app",
     "names": [
       "app.css"
@@ -441,7 +446,7 @@
     "isEntry": true
   },
   "resources/js/app.tsx": {
-    "file": "assets/app-BxQ7EfT7.js",
+    "file": "assets/app-CIuCJvPE.js",
     "name": "app",
     "src": "resources/js/app.tsx",
     "isEntry": true,
@@ -451,6 +456,7 @@
       "_es2015-om5GQIjf.js",
       "_button-CLmz_CQO.js",
       "_dist-CR-Gimhg.js",
+      "_dropdown-menu-BEHcoseA.js",
       "_dist-CCRe9Rvg.js",
       "_separator-CeObqXf_.js",
       "_utils-BNhDZxi-.js",
@@ -463,7 +469,6 @@
       "_shield-check-BVmGjpPE.js",
       "_user-round-S0HE6iBH.js",
       "_users-round-DUddQQHO.js",
-      "_use-flash-toast-B4y_Foio.js",
       "_heading-BSuF8E1S.js",
       "_input-DhgQHJSy.js",
       "_use-appearance-CUyfCUzu.js",
@@ -605,7 +610,7 @@
     ]
   },
   "resources/js/pages/dashboard.tsx": {
-    "file": "assets/dashboard-B_j3h64b.js",
+    "file": "assets/dashboard-BTY-vN7X.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.tsx",
     "isEntry": true,
@@ -615,6 +620,7 @@
       "_checkbox-C0OPe2L6.js",
       "_button-CLmz_CQO.js",
       "_dist-CR-Gimhg.js",
+      "_dropdown-menu-BEHcoseA.js",
       "_label-CQlqb0EK.js",
       "_user-check-Ds9Mj1gu.js",
       "_chevron-right-CNsVt33u.js",
@@ -623,7 +629,6 @@
       "_loader-circle-BLInaTD3.js",
       "_plus-BqfWI7gS.js",
       "_search-BtWxD3uJ.js",
-      "_use-flash-toast-B4y_Foio.js",
       "_badge-Cqd3L9aT.js",
       "_dialog-BXiR4NcM.js",
       "_input-DhgQHJSy.js"

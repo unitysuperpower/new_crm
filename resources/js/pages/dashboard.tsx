@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react';
-// The lucide-react library provides a collection of SVG icons that can be used in the dashboard UI. These icons are imported and used throughout the component to enhance the visual representation of actions, statuses, and navigation elements, making the interface more intuitive and user-friendly.
 import {
     CalendarClock,
+    ChevronsUpDown,
     ChevronLeft,
     ChevronRight,
     Eye,
@@ -36,6 +36,15 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuCheckboxItem,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -55,7 +64,6 @@ type ProgramOption = Option & {
 };
 type TeamMember = Option & { department: string };
 type CampusOption = Option & { is_active: boolean };
-// The stream type represents a single activity or note associated with an inquiry. It includes the ID of the stream, the response text, the user who created the stream (if any), the timestamp of when the stream was created, and the last status of the inquiry at the time of the stream. This type is used to display the discussion history and activity log for each inquiry in the dashboard.
 type Stream = {
     id: number;
     response: string;
@@ -116,12 +124,26 @@ type InquiryForm = {
 
 // The report filters type represents the structure of the filters that can be applied when generating an inquiry report. It includes fields for filtering by campus, status, assigned user, and date range.
 type ReportFilters = {
-    campus_id: string;
-    program_id: string;
-    status: string;
-    assigned_user_id: string;
+    campus_id: string[];
+    program_id: string[];
+    status: string[];
+    assigned_user_id: string[];
     date_from: string;
     date_to: string;
+};
+
+type TableFilters = {
+    search: string;
+    status: string[];
+    department: string[];
+    assigned_user_id: string[];
+    source: string[];
+    program_id: string[];
+    campus_id: string[];
+    date_from: string;
+    date_to: string;
+    queue: 'all' | 'assigned_today' | 'yesterday' | 'today' | 'next_3_days';
+    per_page: string;
 };
 
 // The report inquiry type represents the structure of an inquiry as it appears in the generated report. It includes fields that are relevant for reporting purposes, which may be a subset of the full Inquiry type or may have a different structure to optimize for reporting.
@@ -136,6 +158,9 @@ type ReportInquiry = {
     status: string;
     department: string;
     updated_at: string;
+    latest_comment: string | null;
+    latest_comment_user: string | null;
+    latest_comment_at: string | null;
 };
 
 // The inquiry report type represents the structure of the data returned when generating an inquiry report. It includes metadata about the report generation, the applied filters, counts of inquiries by status, and a list of inquiries that match the report criteria.
@@ -167,6 +192,7 @@ type FilterCounts = {
 // The queue counts type represents the structure of the counts of inquiries in different follow-up queues. It includes the total number of inquiries, the number of inquiries assigned today, and the number of follow-ups scheduled for yesterday, today, and the next 3 days.
 type QueueCounts = {
     total_inquiries: number;
+    all_assigned: number;
     assigned_today: number;
     follow_ups_yesterday: number;
     follow_ups_today: number;
@@ -196,10 +222,10 @@ const emptyInquiry: InquiryForm = {
 
 // The empty report filters constant represents the initial state of the report filters when generating a new inquiry report. It includes default values for all the fields in the ReportFilters type, which can be used to reset the filters after generating a report or when opening the report filter dialog.
 const emptyReportFilters: ReportFilters = {
-    campus_id: '',
-    program_id: '',
-    status: '',
-    assigned_user_id: '',
+    campus_id: [],
+    program_id: [],
+    status: [],
+    assigned_user_id: [],
     date_from: '',
     date_to: '',
 };
@@ -228,7 +254,7 @@ export default function Dashboard({
     pageTitle: string;
     pageUrl: string;
     pageMode: 'all' | 'assigned';
-    filters: Record<string, string>;
+    filters: TableFilters;
     inquiries: Inquiry[];
     pagination: {
         current_page: number;
@@ -268,6 +294,7 @@ export default function Dashboard({
 }) {
     // State variables for managing the dashboard's interactive features, such as filtering, creating inquiries, importing inquiries, viewing inquiry details, managing selected inquiries for bulk actions, handling report generation, and managing search suggestions. These state variables are used to control the visibility of dialogs, store form data, track loading states, and manage user interactions throughout the dashboard.
     const csvInputRef = useRef<HTMLInputElement>(null);
+    const appliedFilterSignature = useRef('');
     const [filterForm, setFilterForm] = useState(filters);
     const [createOpen, setCreateOpen] = useState(false);
     const [importOpen, setImportOpen] = useState(false);
@@ -316,7 +343,7 @@ export default function Dashboard({
         [campuses],
     );
     const tableFilterPrograms = useMemo(
-        () => filterProgramsByCampus(programs, filterForm.campus_id ?? ''),
+        () => filterProgramsByCampus(programs, filterForm.campus_id),
         [filterForm.campus_id, programs],
     );
     const reportFilterPrograms = useMemo(
@@ -352,8 +379,8 @@ export default function Dashboard({
         activeHistory === 'all'
             ? (selected?.streams ?? [])
             : (selected?.streams.filter(
-                (stream) => String(stream.user?.id) === activeHistory,
-            ) ?? []);
+                  (stream) => String(stream.user?.id) === activeHistory,
+              ) ?? []);
 
     const allVisibleSelected =
         inquiries.length > 0 &&
@@ -377,10 +404,33 @@ export default function Dashboard({
     }, [inquiries]);
 
     useEffect(() => {
-        const timer = window.setTimeout(() => setFilterForm(filters), 0);
+        const timer = window.setTimeout(() => {
+            setFilterForm(filters);
+            appliedFilterSignature.current = JSON.stringify(cleanPayload(filters));
+        }, 0);
 
         return () => window.clearTimeout(timer);
     }, [filters]);
+
+    useEffect(() => {
+        const payload = cleanPayload(filterForm);
+        const signature = JSON.stringify(payload);
+
+        if (signature === appliedFilterSignature.current) {
+            return;
+        }
+
+        const timer = window.setTimeout(() => {
+            appliedFilterSignature.current = signature;
+            router.get(pageUrl, payload, {
+                preserveScroll: true,
+                preserveState: true,
+                replace: true,
+            });
+        }, 350);
+
+        return () => window.clearTimeout(timer);
+    }, [filterForm, pageUrl]);
 
     useEffect(() => {
         const visibleIds = new Set(inquiries.map((inquiry) => inquiry.id));
@@ -447,16 +497,29 @@ export default function Dashboard({
 
     const submitFilters = (event: FormEvent) => {
         event.preventDefault();
-        router.get(pageUrl, cleanPayload(filterForm), {
+        const payload = cleanPayload(filterForm);
+        appliedFilterSignature.current = JSON.stringify(payload);
+        router.get(pageUrl, payload, {
             preserveState: true,
             replace: true,
         });
     };
 
     const clearFilters = () => {
-        const resetFilters: Record<string, string> = {
+        const resetFilters: TableFilters = {
+            search: '',
+            status: [],
+            department: [],
+            assigned_user_id: [],
+            source: [],
+            program_id: [],
+            campus_id: [],
+            date_from: '',
+            date_to: '',
             queue: filterForm.queue ?? 'all',
+            per_page: filterForm.per_page ?? '10',
         };
+        appliedFilterSignature.current = JSON.stringify(cleanPayload(resetFilters));
         setFilterForm(resetFilters);
         router.get(pageUrl, resetFilters, {
             preserveState: false,
@@ -468,6 +531,7 @@ export default function Dashboard({
         queue: 'all' | 'assigned_today' | 'yesterday' | 'today' | 'next_3_days',
     ) => {
         const nextFilters = { ...filterForm, queue };
+        appliedFilterSignature.current = JSON.stringify(cleanPayload(nextFilters));
         setFilterForm(nextFilters);
         router.get(pageUrl, cleanPayload(nextFilters), {
             preserveState: true,
@@ -482,6 +546,12 @@ export default function Dashboard({
             onSuccess: () => {
                 setCreateOpen(false);
                 setNewInquiry(createInquiryDefaults);
+            },
+            onError: (errors) => {
+                showErrorToast(
+                    Object.values(errors)[0] ??
+                        'The inquiry could not be created. Please review the details and try again.',
+                );
             },
         });
     };
@@ -503,6 +573,12 @@ export default function Dashboard({
                     if (csvInputRef.current) {
                         csvInputRef.current.value = '';
                     }
+                },
+                onError: (errors) => {
+                    showErrorToast(
+                        Object.values(errors)[0] ??
+                            'The CSV import could not be completed. Please review the rows and try again.',
+                    );
                 },
             },
         );
@@ -574,22 +650,24 @@ export default function Dashboard({
             `/inquiries/${selected.id}/activity`,
             selected.can_update
                 ? {
-                    name: selected.name,
-                    phone: selected.phone,
-                    email: selected.email ?? '',
-                    city: selected.city ?? '',
-                    address: selected.address ?? '',
-                    source: selected.source ?? '',
-                    program_id: selected.program_id ?? '',
-                    previous_program: selected.previous_program ?? '',
-                    campus_id: selected.campus_id ?? '',
-                    message: selected.message ?? '',
-                    status: selected.status,
-                    department: selected.department,
-                    postal_communication: selected.postal_communication,
-                    next_follow_up_at: selected.next_follow_up_at ?? '',
-                    response: streamText,
-                }
+                      name: selected.name,
+                      phone: selected.phone,
+                      email: selected.email ?? '',
+                      city: selected.city ?? '',
+                      address: selected.address ?? '',
+                      source: selected.source ?? '',
+                      program_id: selected.program_id ?? '',
+                      previous_program: selected.previous_program ?? '',
+                      campus_id: selected.campus_id ?? '',
+                      message: selected.message ?? '',
+                      status: selected.status,
+                      department: selected.department,
+                      postal_communication: selected.postal_communication,
+                      scholarship_percentage:
+                          selected.scholarship_percentage ?? '',
+                      next_follow_up_at: selected.next_follow_up_at ?? '',
+                      response: streamText,
+                  }
                 : { response: streamText },
             {
                 preserveScroll: true,
@@ -601,7 +679,7 @@ export default function Dashboard({
                 onError: (errors) => {
                     setInquiryUpdateError(
                         Object.values(errors)[0] ??
-                        'The inquiry could not be updated.',
+                            'The inquiry could not be updated.',
                     );
                 },
                 onFinish: () => setUpdatingInquiry(false),
@@ -735,7 +813,7 @@ export default function Dashboard({
                 </div>
 
                 {crmPermissions.canViewDashboardMetrics && (
-                    <div className="grid gap-3 md:grid-cols-4">
+                    <div className="grid gap-3 md:grid-cols-5">
                         <Metric
                             label={
                                 metricsScope === 'assigned'
@@ -743,6 +821,10 @@ export default function Dashboard({
                                     : 'All inquiries'
                             }
                             value={queueCounts.total_inquiries}
+                        />
+                        <Metric
+                            label="All assigned"
+                            value={queueCounts.all_assigned}
                         />
                         <Metric
                             label="Assigned today"
@@ -767,8 +849,8 @@ export default function Dashboard({
                                     {filterForm.queue === 'assigned_today'
                                         ? 'Assigned today'
                                         : metricsScope === 'assigned'
-                                            ? 'My assigned inquiries'
-                                            : 'All inquiries'}
+                                          ? 'My assigned inquiries'
+                                          : 'All inquiries'}
                                 </h2>
                                 <p className="text-sm text-muted-foreground">
                                     {filterForm.queue === 'assigned_today'
@@ -776,8 +858,8 @@ export default function Dashboard({
                                             ? 'Inquiries assigned to you today.'
                                             : 'All inquiries assigned today across active campuses.'
                                         : metricsScope === 'assigned'
-                                            ? 'Review every inquiry assigned to you and focus by follow-up date.'
-                                            : 'Complete inquiry register across active campuses.'}
+                                          ? 'Review every inquiry assigned to you and focus by follow-up date.'
+                                          : 'Complete inquiry register across active campuses.'}
                                 </p>
                             </div>
                         )}
@@ -797,11 +879,11 @@ export default function Dashboard({
                                     {metricsScope === 'assigned'
                                         ? 'All assigned'
                                         : 'All inquiries'}
-
-                                    <Badge variant="outline">
-                                        {queueCounts.total_inquiries}
-                                    </Badge>
-
+                                    {crmPermissions.canViewDashboardMetrics && (
+                                        <Badge variant="outline">
+                                            {queueCounts.total_inquiries}
+                                        </Badge>
+                                    )}
                                 </Button>
                                 <Button
                                     type="button"
@@ -817,11 +899,11 @@ export default function Dashboard({
                                     }
                                 >
                                     Assigned today
-
-                                    <Badge variant="outline">
-                                        {queueCounts.assigned_today}
-                                    </Badge>
-
+                                    {crmPermissions.canViewDashboardMetrics && (
+                                        <Badge variant="outline">
+                                            {queueCounts.assigned_today}
+                                        </Badge>
+                                    )}
                                 </Button>
                                 {pageMode === 'assigned' && (
                                     <>
@@ -839,13 +921,13 @@ export default function Dashboard({
                                             }
                                         >
                                             Yesterday
-
-                                            <Badge variant="outline">
-                                                {
-                                                    queueCounts.follow_ups_yesterday
-                                                }
-                                            </Badge>
-
+                                            {crmPermissions.canViewDashboardMetrics && (
+                                                <Badge variant="outline">
+                                                    {
+                                                        queueCounts.follow_ups_yesterday
+                                                    }
+                                                </Badge>
+                                            )}
                                         </Button>
                                         <Button
                                             type="button"
@@ -861,20 +943,20 @@ export default function Dashboard({
                                             }
                                         >
                                             Today
-
-                                            <Badge variant="outline">
-                                                {
-                                                    queueCounts.follow_ups_today
-                                                }
-                                            </Badge>
-
+                                            {crmPermissions.canViewDashboardMetrics && (
+                                                <Badge variant="outline">
+                                                    {
+                                                        queueCounts.follow_ups_today
+                                                    }
+                                                </Badge>
+                                            )}
                                         </Button>
                                         <Button
                                             type="button"
                                             size="sm"
                                             variant={
                                                 filterForm.queue ===
-                                                    'next_3_days'
+                                                'next_3_days'
                                                     ? 'secondary'
                                                     : 'ghost'
                                             }
@@ -886,13 +968,13 @@ export default function Dashboard({
                                             }
                                         >
                                             Next 3 days
-
-                                            <Badge variant="outline">
-                                                {
-                                                    queueCounts.follow_ups_next_3_days
-                                                }
-                                            </Badge>
-
+                                            {crmPermissions.canViewDashboardMetrics && (
+                                                <Badge variant="outline">
+                                                    {
+                                                        queueCounts.follow_ups_next_3_days
+                                                    }
+                                                </Badge>
+                                            )}
                                         </Button>
                                     </>
                                 )}
@@ -1006,20 +1088,29 @@ export default function Dashboard({
                             </div>
 
                             <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-5">
-                                <FilterSelect
+                                <MultiSelectFilter
                                     placeholder="Status"
-                                    value={filterForm.status ?? ''}
-                                    options={statusOptions}
-                                    counts={filterCounts.status}
+                                    values={filterForm.status}
+                                    options={statusOptions.map((status) => ({
+                                        value: status,
+                                        label: status,
+                                        count: filterCounts.status[status] ?? 0,
+                                    }))}
                                     onChange={(status) =>
-                                        setFilterForm({ ...filterForm, status })
+                                        setFilterForm({
+                                            ...filterForm,
+                                            status,
+                                        })
                                     }
                                 />
-                                <FilterSelect
+                                <MultiSelectFilter
                                     placeholder="Department"
-                                    value={filterForm.department ?? ''}
-                                    options={departmentOptions}
-                                    counts={filterCounts.department}
+                                    values={filterForm.department}
+                                    options={departmentOptions.map((department) => ({
+                                        value: department,
+                                        label: department,
+                                        count: filterCounts.department[department] ?? 0,
+                                    }))}
                                     onChange={(department) =>
                                         setFilterForm({
                                             ...filterForm,
@@ -1028,114 +1119,71 @@ export default function Dashboard({
                                     }
                                 />
                                 {pageMode === 'all' && (
-                                    <Select
-                                        value={
-                                            filterForm.assigned_user_id || 'all'
-                                        }
-                                        onValueChange={(value) =>
+                                    <MultiSelectFilter
+                                        placeholder="Assigned user"
+                                        values={filterForm.assigned_user_id}
+                                        options={teamMembers.map((member) => ({
+                                            value: String(member.id),
+                                            label: member.name,
+                                            count:
+                                                filterCounts.assigned_user[
+                                                    String(member.id)
+                                                ] ?? 0,
+                                        }))}
+                                        onChange={(assigned_user_id) =>
                                             setFilterForm({
                                                 ...filterForm,
-                                                assigned_user_id:
-                                                    value === 'all'
-                                                        ? ''
-                                                        : value,
+                                                assigned_user_id,
                                             })
                                         }
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="Assigned user" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All users
-                                            </SelectItem>
-                                            {teamMembers.map((member) => (
-                                                <SelectItem
-                                                    key={member.id}
-                                                    value={String(member.id)}
-                                                >
-                                                    {member.name} (
-                                                    {filterCounts.assigned_user[
-                                                        String(member.id)
-                                                    ] ?? 0}
-                                                    )
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    />
                                 )}
-                                <FilterSelect
+                                <MultiSelectFilter
                                     placeholder="Source"
-                                    value={filterForm.source ?? ''}
-                                    options={sourceOptions}
-                                    counts={filterCounts.source}
+                                    values={filterForm.source}
+                                    options={sourceOptions.map((source) => ({
+                                        value: source,
+                                        label: source,
+                                        count: filterCounts.source[source] ?? 0,
+                                    }))}
                                     onChange={(source) =>
-                                        setFilterForm({ ...filterForm, source })
+                                        setFilterForm({
+                                            ...filterForm,
+                                            source,
+                                        })
                                     }
                                 />
-                                <Select
-                                    value={filterForm.program_id || 'all'}
-                                    onValueChange={(value) =>
+                                <MultiSelectFilter
+                                    placeholder="Program"
+                                    values={filterForm.program_id}
+                                    options={tableFilterPrograms.map((program) => ({
+                                        value: String(program.id),
+                                        label: program.name,
+                                        count: filterCounts.program[String(program.id)] ?? 0,
+                                    }))}
+                                    onChange={(program_id) =>
                                         setFilterForm({
                                             ...filterForm,
-                                            program_id:
-                                                value === 'all' ? '' : value,
+                                            program_id,
                                         })
                                     }
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Program" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All programs
-                                        </SelectItem>
-                                        {tableFilterPrograms.map((program) => (
-                                            <SelectItem
-                                                key={program.id}
-                                                value={String(program.id)}
-                                            >
-                                                {program.name} (
-                                                {filterCounts.program[
-                                                    String(program.id)
-                                                ] ?? 0}
-                                                )
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                <Select
-                                    value={filterForm.campus_id || 'all'}
-                                    onValueChange={(value) =>
+                                />
+                                <MultiSelectFilter
+                                    placeholder="Campus"
+                                    values={filterForm.campus_id}
+                                    options={activeCampuses.map((campus) => ({
+                                        value: String(campus.id),
+                                        label: campus.name,
+                                        count: filterCounts.campus[String(campus.id)] ?? 0,
+                                    }))}
+                                    onChange={(campus_id) =>
                                         setFilterForm({
                                             ...filterForm,
-                                            campus_id:
-                                                value === 'all' ? '' : value,
-                                            program_id: '',
+                                            campus_id,
+                                            program_id: [],
                                         })
                                     }
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="Campus" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All campus
-                                        </SelectItem>
-                                        {activeCampuses.map((campus) => (
-                                            <SelectItem
-                                                key={campus.id}
-                                                value={String(campus.id)}
-                                            >
-                                                {campus.name} (
-                                                {filterCounts.campus[
-                                                    String(campus.id)
-                                                ] ?? 0}
-                                                )
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                />
                                 <Input
                                     type="date"
                                     aria-label="From date"
@@ -1238,13 +1286,13 @@ export default function Dashboard({
                                     )}
                                     <Th>Action</Th>
                                     <Th>Name</Th>
-                                    <Th>Status</Th>
+                                    <Th>Source</Th>
                                     <Th>Program</Th>
                                     <Th>Previous program</Th>
-                                    <Th>Assigned</Th>
-                                    <Th>Department</Th>
-                                    <Th>Source</Th>
                                     <Th>Campus</Th>
+                                    <Th>Assigned</Th>
+                                    <Th>Status</Th>
+                                    <Th>Department</Th>
                                     <Th>Follow up</Th>
                                     <Th>Last discussion</Th>
                                 </tr>
@@ -1297,22 +1345,22 @@ export default function Dashboard({
                                                 {canDownloadInvitationLetter(
                                                     inquiry,
                                                 ) && (
-                                                        <Button
-                                                            type="button"
-                                                            variant="outline"
-                                                            size="icon"
-                                                            className="size-8 text-primary"
-                                                            title="Preview invitation letter PDF"
-                                                            onClick={() =>
-                                                                openLetterPreview(
-                                                                    inquiry,
-                                                                    'invitation',
-                                                                )
-                                                            }
-                                                        >
-                                                            <FileText />
-                                                        </Button>
-                                                    )}
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="icon"
+                                                        className="size-8 text-primary"
+                                                        title="Preview invitation letter PDF"
+                                                        onClick={() =>
+                                                            openLetterPreview(
+                                                                inquiry,
+                                                                'invitation',
+                                                            )
+                                                        }
+                                                    >
+                                                        <FileText />
+                                                    </Button>
+                                                )}
                                                 {canDownloadScholarshipLetter(
                                                     inquiry,
                                                 ) && (
@@ -1347,37 +1395,33 @@ export default function Dashboard({
                                                 </div>
                                             )}
                                         </Td>
+                                        <Td>{inquiry.source || 'Not set'}</Td>
+                                        <Td>
+                                            {inquiry.program?.name ??
+                                                'No program'}
+                                        </Td>
+                                        <Td>
+                                            {inquiry.previous_program ||
+                                                'Not set'}
+                                        </Td>
+                                        <Td>
+                                            {inquiry.campus_model?.name ??
+                                                inquiry.campus ??
+                                                'Not set'}
+                                        </Td>
+                                        <Td>
+                                            {inquiry.assigned_user?.name ??
+                                                'Unassigned'}
+                                        </Td>
                                         <Td>
                                             <StatusBadge
                                                 status={inquiry.status}
                                             />
                                         </Td>
-
-                                        <Td>
-                                            {inquiry.program?.name ??
-                                                'No program'}
-                                        </Td>
-
-                                        <Td>
-                                            {inquiry.previous_program ||
-                                                'Not set'}
-                                        </Td>
-
-                                        <Td>
-                                            {inquiry.assigned_user?.name ??
-                                                'Unassigned'}
-                                        </Td>
-
                                         <Td>
                                             <span className="capitalize">
                                                 {inquiry.department}
                                             </span>
-                                        </Td>
-                                        <Td>{inquiry.source || 'Not set'}</Td>
-                                        <Td>
-                                            {inquiry.campus_model?.name ??
-                                                inquiry.campus ??
-                                                'Not set'}
                                         </Td>
                                         <Td className="whitespace-nowrap">
                                             <span className="inline-flex items-center gap-1.5">
@@ -1472,127 +1516,70 @@ export default function Dashboard({
                     <form className="space-y-4" onSubmit={generateReport}>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <ReportField label="Campus">
-                                <Select
-                                    value={reportFilters.campus_id || 'all'}
-                                    onValueChange={(value) =>
+                                <MultiSelectFilter
+                                    placeholder="All campuses"
+                                    values={reportFilters.campus_id}
+                                    options={activeCampuses.map((campus) => ({
+                                        value: String(campus.id),
+                                        label: campus.name,
+                                    }))}
+                                    onChange={(campus_id) =>
                                         setReportFilters({
                                             ...reportFilters,
-                                            campus_id:
-                                                value === 'all' ? '' : value,
-                                            program_id: '',
+                                            campus_id,
+                                            program_id: [],
                                         })
                                     }
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="All campuses" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All campuses
-                                        </SelectItem>
-                                        {activeCampuses.map((campus) => (
-                                            <SelectItem
-                                                key={campus.id}
-                                                value={String(campus.id)}
-                                            >
-                                                {campus.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                />
                             </ReportField>
                             <ReportField label="Program">
-                                <Select
-                                    value={reportFilters.program_id || 'all'}
-                                    onValueChange={(value) =>
+                                <MultiSelectFilter
+                                    placeholder="All programs"
+                                    values={reportFilters.program_id}
+                                    options={reportFilterPrograms.map((program) => ({
+                                        value: String(program.id),
+                                        label: program.name,
+                                    }))}
+                                    onChange={(program_id) =>
                                         setReportFilters({
                                             ...reportFilters,
-                                            program_id:
-                                                value === 'all' ? '' : value,
+                                            program_id,
                                         })
                                     }
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="All programs" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All programs
-                                        </SelectItem>
-                                        {reportFilterPrograms.map((program) => (
-                                            <SelectItem
-                                                key={program.id}
-                                                value={String(program.id)}
-                                            >
-                                                {program.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                />
                             </ReportField>
                             <ReportField label="Status">
-                                <Select
-                                    value={reportFilters.status || 'all'}
-                                    onValueChange={(value) =>
+                                <MultiSelectFilter
+                                    placeholder="All statuses"
+                                    values={reportFilters.status}
+                                    options={statusOptions.map((status) => ({
+                                        value: status,
+                                        label: status,
+                                    }))}
+                                    onChange={(status) =>
                                         setReportFilters({
                                             ...reportFilters,
-                                            status:
-                                                value === 'all' ? '' : value,
+                                            status,
                                         })
                                     }
-                                >
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue placeholder="All statuses" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All statuses
-                                        </SelectItem>
-                                        {statusOptions.map((status) => (
-                                            <SelectItem
-                                                key={status}
-                                                value={status}
-                                            >
-                                                {status}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
+                                />
                             </ReportField>
                             {crmPermissions.canAssignInquiry && (
                                 <ReportField label="Assigned user">
-                                    <Select
-                                        value={
-                                            reportFilters.assigned_user_id ||
-                                            'all'
-                                        }
-                                        onValueChange={(value) =>
+                                    <MultiSelectFilter
+                                        placeholder="All users"
+                                        values={reportFilters.assigned_user_id}
+                                        options={teamMembers.map((member) => ({
+                                            value: String(member.id),
+                                            label: member.name,
+                                        }))}
+                                        onChange={(assigned_user_id) =>
                                             setReportFilters({
                                                 ...reportFilters,
-                                                assigned_user_id:
-                                                    value === 'all'
-                                                        ? ''
-                                                        : value,
+                                                assigned_user_id,
                                             })
                                         }
-                                    >
-                                        <SelectTrigger className="w-full">
-                                            <SelectValue placeholder="All users" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="all">
-                                                All users
-                                            </SelectItem>
-                                            {teamMembers.map((member) => (
-                                                <SelectItem
-                                                    key={member.id}
-                                                    value={String(member.id)}
-                                                >
-                                                    {member.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                                    />
                                 </ReportField>
                             )}
                             <ReportField label="From updated date">
@@ -1698,28 +1685,29 @@ export default function Dashboard({
                                 </span>
                             </div>
                             <div className="relative max-h-[55vh] overflow-auto rounded-md border">
-                                <table className="w-full min-w-[1050px] text-sm">
+                                <table className="w-full min-w-[1190px] text-sm">
                                     <thead className="sticky top-0 z-10 bg-muted text-muted-foreground shadow-[inset_0_-1px_0_var(--border)]">
                                         <tr>
-                                            {/* <Th>ID</Th> */}
+                                            <Th>S.No.</Th>
                                             <Th>Student</Th>
                                             <Th>Program</Th>
                                             <Th>Campus</Th>
                                             <Th>Assigned user</Th>
                                             <Th>Status</Th>
                                             <Th>Department</Th>
+                                            <Th>Latest discussion</Th>
                                             <Th>Last updated</Th>
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {report.inquiries.map((inquiry) => (
+                                        {report.inquiries.map((inquiry, index) => (
                                             <tr
                                                 key={inquiry.id}
                                                 className="border-t transition-colors hover:bg-muted/35"
                                             >
-                                                {/* <Td className="font-mono text-xs text-muted-foreground">
-                                                    #{inquiry.id}
-                                                </Td> */}
+                                                <Td className="font-mono text-xs text-muted-foreground">
+                                                    {index + 1}
+                                                </Td>
                                                 <Td className="min-w-52">
                                                     <div className="font-semibold text-foreground">
                                                         {inquiry.name}
@@ -1755,6 +1743,27 @@ export default function Dashboard({
                                                         {inquiry.department}
                                                     </span>
                                                 </Td>
+                                                <Td className="min-w-72">
+                                                    {inquiry.latest_comment ? (
+                                                        <div>
+                                                            <p className="line-clamp-2 text-sm leading-5">
+                                                                {
+                                                                    inquiry.latest_comment
+                                                                }
+                                                            </p>
+                                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                                {inquiry.latest_comment_user ??
+                                                                    'Employee'}
+                                                                {inquiry.latest_comment_at &&
+                                                                    ` | ${inquiry.latest_comment_at}`}
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            No discussion yet
+                                                        </span>
+                                                    )}
+                                                </Td>
                                                 <Td className="whitespace-nowrap text-muted-foreground">
                                                     {inquiry.updated_at}
                                                 </Td>
@@ -1764,7 +1773,7 @@ export default function Dashboard({
                                             <tr>
                                                 <td
                                                     className="p-12 text-center text-muted-foreground"
-                                                    colSpan={8}
+                                                    colSpan={9}
                                                 >
                                                     No inquiries match these
                                                     report filters.
@@ -2079,20 +2088,20 @@ export default function Dashboard({
 
                                         {(selected.can_update ||
                                             selected.can_stream) && (
-                                                <DialogFooter className="border-t pt-4">
-                                                    <Button
-                                                        type="submit"
-                                                        disabled={updatingInquiry}
-                                                    >
-                                                        <Send />
-                                                        {updatingInquiry
-                                                            ? 'Saving...'
-                                                            : selected.can_update
-                                                                ? 'Update inquiry and stream'
-                                                                : 'Submit stream'}
-                                                    </Button>
-                                                </DialogFooter>
-                                            )}
+                                            <DialogFooter className="border-t pt-4">
+                                                <Button
+                                                    type="submit"
+                                                    disabled={updatingInquiry}
+                                                >
+                                                    <Send />
+                                                    {updatingInquiry
+                                                        ? 'Saving...'
+                                                        : selected.can_update
+                                                          ? 'Update inquiry and stream'
+                                                          : 'Submit stream'}
+                                                </Button>
+                                            </DialogFooter>
+                                        )}
                                     </form>
                                 </div>
 
@@ -2450,9 +2459,9 @@ function InquiryWorkflowFields({
                                 ...inquiry,
                                 postal_communication:
                                     postal_communication as
-                                    | 'pending'
-                                    | 'created'
-                                    | 'sent',
+                                        | 'pending'
+                                        | 'created'
+                                        | 'sent',
                             })
                         }
                     />
@@ -2580,6 +2589,14 @@ function InquiryDetailsFields({
                         })
                     }
                 />
+                <Field
+                    label="Scholarship %"
+                    type="number"
+                    value={inquiry.scholarship_percentage ?? ''}
+                    onChange={(scholarship_percentage) =>
+                        onChange({ ...inquiry, scholarship_percentage })
+                    }
+                />
             </div>
             <div className="grid gap-2">
                 <Label>Address</Label>
@@ -2605,7 +2622,6 @@ function InquiryDetailsFields({
                 label="Assigned user"
                 value={inquiry.assigned_user?.name ?? 'Unassigned'}
             />
-
         </div>
     );
 }
@@ -2703,6 +2719,15 @@ function InquiryDetailsSummary({
                 <Info
                     label="Initial message"
                     value={inquiry.message ?? 'Not set'}
+                />
+                <Info label="Inquiry date" value={inquiry.created_at} />
+                <Info
+                    label="Scholarship"
+                    value={
+                        Number(inquiry.scholarship_percentage ?? 0) > 0
+                            ? `${formatScholarshipPercentage(inquiry.scholarship_percentage)}%`
+                            : 'Not offered'
+                    }
                 />
             </div>
         </section>
@@ -2888,7 +2913,9 @@ function reportQuery(filters: ReportFilters): string {
     const params = new URLSearchParams();
 
     Object.entries(filters).forEach(([key, value]) => {
-        if (value) {
+        if (Array.isArray(value)) {
+            value.forEach((item) => params.append(`${key}[]`, item));
+        } else if (value) {
             params.set(key, value);
         }
     });
@@ -3061,6 +3088,94 @@ function FilterSelect({
     );
 }
 
+function MultiSelectFilter({
+    placeholder,
+    values,
+    options,
+    onChange,
+}: {
+    placeholder: string;
+    values: string[];
+    options: Array<{ value: string; label: string; count?: number }>;
+    onChange: (values: string[]) => void;
+}) {
+    const selectedLabels = options
+        .filter((option) => values.includes(option.value))
+        .map((option) => option.label);
+    const triggerLabel =
+        selectedLabels.length === 0
+            ? `All ${placeholder.toLowerCase()}`
+            : selectedLabels.length === 1
+              ? selectedLabels[0]
+              : `${placeholder} (${selectedLabels.length})`;
+
+    const toggle = (value: string, checked: boolean) => {
+        onChange(
+            checked
+                ? [...new Set([...values, value])]
+                : values.filter((item) => item !== value),
+        );
+    };
+
+    return (
+        <DropdownMenu modal={false}>
+            <DropdownMenuTrigger asChild>
+                <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-between font-normal"
+                >
+                    <span className="truncate">{triggerLabel}</span>
+                    <ChevronsUpDown className="text-muted-foreground" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="max-h-80 w-[var(--radix-dropdown-menu-trigger-width)] overflow-y-auto">
+                <DropdownMenuLabel>{placeholder}</DropdownMenuLabel>
+                <DropdownMenuCheckboxItem
+                    checked={options.length > 0 && values.length === options.length}
+                    onSelect={(event) => event.preventDefault()}
+                    onCheckedChange={(checked) =>
+                        onChange(checked ? options.map((option) => option.value) : [])
+                    }
+                >
+                    Select all
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuItem
+                    disabled={values.length === 0}
+                    onSelect={() => onChange([])}
+                >
+                    Clear selection
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {options.map((option) => (
+                    <DropdownMenuCheckboxItem
+                        key={option.value}
+                        checked={values.includes(option.value)}
+                        onSelect={(event) => event.preventDefault()}
+                        onCheckedChange={(checked) =>
+                            toggle(option.value, checked === true)
+                        }
+                    >
+                        <span className="min-w-0 flex-1 truncate capitalize">
+                            {option.label}
+                        </span>
+                        {typeof option.count === 'number' && (
+                            <span className="text-xs text-muted-foreground">
+                                {option.count}
+                            </span>
+                        )}
+                    </DropdownMenuCheckboxItem>
+                ))}
+                {options.length === 0 && (
+                    <div className="px-2 py-5 text-center text-xs text-muted-foreground">
+                        No options available.
+                    </div>
+                )}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
 function SelectField({
     label,
     value,
@@ -3151,7 +3266,15 @@ function canDownloadInvitationLetter(inquiry: Inquiry): boolean {
 }
 
 function canDownloadScholarshipLetter(inquiry: Inquiry): boolean {
-    return Number(inquiry.scholarship_percentage) > 0;
+    return Number(inquiry.scholarship_percentage ?? 0) > 0;
+}
+
+function formatScholarshipPercentage(value: string | null): string {
+    const percentage = Number(value ?? 0);
+
+    return Number.isInteger(percentage)
+        ? String(percentage)
+        : percentage.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function postalCommunicationLabel(value: string): string {
@@ -3249,9 +3372,11 @@ function Td({
     );
 }
 
-function cleanPayload(payload: Record<string, string>) {
+function cleanPayload(payload: object) {
     return Object.fromEntries(
-        Object.entries(payload).filter(([, value]) => value !== ''),
+        Object.entries(payload as Record<string, string | string[]>).filter(([, value]) =>
+            Array.isArray(value) ? value.length > 0 : value !== '',
+        ),
     );
 }
 
@@ -3266,9 +3391,9 @@ function normalizeInquiry(row: InquiryForm, includeCsvProgram = false) {
         program_id: row.program_id || null,
         ...(includeCsvProgram
             ? {
-                program: row.program || null,
-                program_duration: row.program_duration || null,
-            }
+                  program: row.program || null,
+                  program_duration: row.program_duration || null,
+              }
             : {}),
         previous_program: row.previous_program || null,
         campus_id: row.campus_id || null,
@@ -3334,14 +3459,18 @@ function parseCsv(text: string): Record<string, string>[] {
 
 function filterProgramsByCampus(
     programs: ProgramOption[],
-    campusId: string,
+    campusId: string | string[],
 ): ProgramOption[] {
-    if (!campusId) {
+    const campusIds = (Array.isArray(campusId) ? campusId : [campusId]).filter(
+        Boolean,
+    );
+
+    if (campusIds.length === 0) {
         return programs;
     }
 
     return programs.filter(
-        (program) => String(program.campus_id ?? '') === campusId,
+        (program) => campusIds.includes(String(program.campus_id ?? '')),
     );
 }
 
@@ -3366,7 +3495,7 @@ function csvRowToInquiry(
         (program) =>
             program.name.toLowerCase() === programName.toLowerCase() ||
             normalizeProgramName(program.name) ===
-            normalizeProgramName(programName),
+                normalizeProgramName(programName),
     );
 
     return {
