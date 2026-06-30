@@ -59,6 +59,7 @@ class InquiryController extends Controller
 
         $isInquiryPage = $request->routeIs('inquiries.index');
         $queue = $filters['queue'] ?? 'all';
+        $metricsAssignedOnly = $isInquiryPage || $user->role === UserRole::User;
 
         $query = $this->workspaceQuery($request, $isInquiryPage, $queue)
             ->with(['program:id,name,campus_id,duration', 'campusModel:id,name', 'assignedUser:id,name', 'streams.user:id,name'])
@@ -160,7 +161,8 @@ class InquiryController extends Controller
                 'department' => $request->user()->department ?? 'admission',
             ],
             'filterCounts' => $this->filterCounts($request, $isInquiryPage, $queue),
-            'queueCounts' => $this->queueCounts($request, $isInquiryPage),
+            'queueCounts' => $this->queueCounts($request, $metricsAssignedOnly),
+            'metricsScope' => $metricsAssignedOnly ? 'assigned' : 'global',
             'crmPermissions' => [
                 'canCreateInquiry' => $request->user()->can('create', Inquiry::class),
                 'canImportInquiry' => $request->user()->can('import', Inquiry::class),
@@ -168,7 +170,7 @@ class InquiryController extends Controller
                 'canSelectInquiryAssignee' => $request->user()->role === UserRole::SuperAdmin,
                 'canChangeInquiryDepartment' => $request->user()->role === UserRole::SuperAdmin,
                 'canManageCampus' => $request->user()->can('update', new Campus),
-                'canViewDashboardMetrics' => in_array($request->user()->role, [UserRole::SuperAdmin, UserRole::Admin], true),
+                'canViewDashboardMetrics' => true,
             ],
         ]);
     }
@@ -271,8 +273,11 @@ class InquiryController extends Controller
 
         $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '-', $inquiry->name) ?: 'student';
 
+        $filename = 'student-inquiry-'.$safeName.'.pdf';
+        $disposition = $request->boolean('download') ? 'attachment' : 'inline';
+
         return response($pdf->output(), 200, [
-            'Content-Disposition' => 'attachment; filename="student-inquiry-'.$safeName.'.pdf"',
+            'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
             'Content-Type' => 'application/pdf',
         ]);
     }
@@ -304,8 +309,11 @@ class InquiryController extends Controller
 
         $safeName = preg_replace('/[^A-Za-z0-9_-]+/', '-', $inquiry->name) ?: 'student';
 
+        $filename = 'scholarship-letter-'.$safeName.'.pdf';
+        $disposition = $request->boolean('download') ? 'attachment' : 'inline';
+
         return response($pdf->output(), 200, [
-            'Content-Disposition' => 'attachment; filename="scholarship-letter-'.$safeName.'.pdf"',
+            'Content-Disposition' => $disposition.'; filename="'.$filename.'"',
             'Content-Type' => 'application/pdf',
         ]);
     }
