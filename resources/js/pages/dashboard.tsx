@@ -2042,6 +2042,13 @@ export default function Dashboard({
                                         ) : (
                                             <InquiryDetailsSummary
                                                 inquiry={selected}
+                                                letterInquiry={
+                                                    inquiries.find(
+                                                        (inquiry) =>
+                                                            inquiry.id ===
+                                                            selected.id,
+                                                    ) ?? selected
+                                                }
                                                 canEdit={selected.can_update}
                                                 onPreviewLetter={
                                                     openLetterPreview
@@ -2628,11 +2635,13 @@ function InquiryDetailsFields({
 
 function InquiryDetailsSummary({
     inquiry,
+    letterInquiry,
     canEdit,
     onPreviewLetter,
     onEdit,
 }: {
     inquiry: Inquiry;
+    letterInquiry: Inquiry;
     canEdit: boolean;
     onPreviewLetter: (
         inquiry: Inquiry,
@@ -2650,19 +2659,21 @@ function InquiryDetailsSummary({
                     </p>
                 </div>
                 <div className="flex items-center gap-1">
-                    {canDownloadInvitationLetter(inquiry) && (
+                    {canDownloadInvitationLetter(letterInquiry) && (
                         <Button
                             type="button"
                             size="icon"
                             variant="ghost"
                             className="text-primary"
                             title="Preview invitation letter PDF"
-                            onClick={() => onPreviewLetter(inquiry, 'invitation')}
+                            onClick={() =>
+                                onPreviewLetter(letterInquiry, 'invitation')
+                            }
                         >
                             <FileText />
                         </Button>
                     )}
-                    {canDownloadScholarshipLetter(inquiry) && (
+                    {canDownloadScholarshipLetter(letterInquiry) && (
                         <Button
                             type="button"
                             size="icon"
@@ -2670,7 +2681,7 @@ function InquiryDetailsSummary({
                             className="text-primary"
                             title="Preview scholarship letter PDF"
                             onClick={() =>
-                                onPreviewLetter(inquiry, 'scholarship')
+                                onPreviewLetter(letterInquiry, 'scholarship')
                             }
                         >
                             <FileDown />

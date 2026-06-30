@@ -446,7 +446,7 @@
     "isEntry": true
   },
   "resources/js/app.tsx": {
-    "file": "assets/app-BMpiX8f2.js",
+    "file": "assets/app-CAcsLkF0.js",
     "name": "app",
     "src": "resources/js/app.tsx",
     "isEntry": true,
@@ -610,7 +610,7 @@
     ]
   },
   "resources/js/pages/dashboard.tsx": {
-    "file": "assets/dashboard-GSuIQuEf.js",
+    "file": "assets/dashboard-W1vQYJQi.js",
     "name": "dashboard",
     "src": "resources/js/pages/dashboard.tsx",
     "isEntry": true,
