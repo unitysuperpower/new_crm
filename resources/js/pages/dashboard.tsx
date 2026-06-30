@@ -1286,14 +1286,14 @@ export default function Dashboard({
                                     )}
                                     <Th>Action</Th>
                                     <Th>Name</Th>
-                                    <Th>Source</Th>
+                                    <Th>Status</Th>
                                     <Th>Program</Th>
                                     <Th>Previous program</Th>
-                                    <Th>Campus</Th>
                                     <Th>Assigned</Th>
-                                    <Th>Status</Th>
                                     <Th>Department</Th>
-                                    <Th>Follow up</Th>
+                                    <Th>Source</Th>
+                                    <Th>Campus</Th>
+                                    <Th>Next follow up</Th>
                                     <Th>Last discussion</Th>
                                 </tr>
                             </thead>
@@ -1395,7 +1395,11 @@ export default function Dashboard({
                                                 </div>
                                             )}
                                         </Td>
-                                        <Td>{inquiry.source || 'Not set'}</Td>
+                                        <Td>
+                                            <StatusBadge
+                                                status={inquiry.status}
+                                            />
+                                        </Td>
                                         <Td>
                                             {inquiry.program?.name ??
                                                 'No program'}
@@ -1405,23 +1409,19 @@ export default function Dashboard({
                                                 'Not set'}
                                         </Td>
                                         <Td>
-                                            {inquiry.campus_model?.name ??
-                                                inquiry.campus ??
-                                                'Not set'}
-                                        </Td>
-                                        <Td>
                                             {inquiry.assigned_user?.name ??
                                                 'Unassigned'}
-                                        </Td>
-                                        <Td>
-                                            <StatusBadge
-                                                status={inquiry.status}
-                                            />
                                         </Td>
                                         <Td>
                                             <span className="capitalize">
                                                 {inquiry.department}
                                             </span>
+                                        </Td>
+                                        <Td>{inquiry.source || 'Not set'}</Td>
+                                        <Td>
+                                            {inquiry.campus_model?.name ??
+                                                inquiry.campus ??
+                                                'Not set'}
                                         </Td>
                                         <Td className="whitespace-nowrap">
                                             <span className="inline-flex items-center gap-1.5">
